@@ -1,8 +1,8 @@
 # Visual Creative Tab Editor / 可视化创造标签页编辑器
 
-中文名：**可视化创造标签页编辑器**。这是一个用于可视化、数据驱动编辑 Minecraft 创造标签页的 Fabric 与 NeoForge 多加载器 Mod。
+中文名：**可视化创造标签页编辑器**。这是一个用于可视化、数据驱动编辑 Minecraft 创造标签页的 Fabric、NeoForge 与 Forge 多加载器 Mod。
 
-A Fabric and NeoForge mod for visual, data-driven editing of Minecraft creative mode tabs.
+A Fabric, NeoForge, and Forge mod for visual, data-driven editing of Minecraft creative mode tabs.
 
 ## 当前状态 / Current status
 
@@ -18,17 +18,18 @@ A Fabric and NeoForge mod for visual, data-driven editing of Minecraft creative 
 
 The current version includes the data-driven catalog, world-local priority packs,
 the unified visual editor, semantic sorting, server validation, conflict handling,
-and native Fabric/NeoForge pagination integration.
+and native Fabric/NeoForge/Forge pagination integration.
 
 ## 支持版本 / Supported versions
 
 | 项目 / Component | 版本 / Version |
 | --- | --- |
-| Mod | `26.2.0.0` |
-| Minecraft | `26.2` |
-| Java | `25+` |
-| Fabric | Loader `0.19.3+` + Fabric API；tested with `0.152.1+26.2` |
-| NeoForge | `26.2.0.1-beta+` |
+| Mod | `1.0.0` |
+| Minecraft | `1.21.1` |
+| Java | `21+` |
+| Fabric | Loader `0.16.9+` + Fabric API；configured with `0.109.0+1.21.1` |
+| NeoForge | `21.1.80+` |
+| Forge | `52.0.28+` |
 
 多人游戏需要客户端和服务端同时安装。Fabric 环境需要 Fabric API。
 
@@ -51,16 +52,18 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 .\gradlew.bat build
 .\gradlew.bat :fabric:runClient
 .\gradlew.bat :neoforge:runClient
+.\gradlew.bat :forge:runClient
 ```
 
 构建产物：
 
 ```text
-fabric/build/libs/visual_creative_tab_editor-fabric-26.2-26.2.0.0.jar
-neoforge/build/libs/visual_creative_tab_editor-neoforge-26.2-26.2.0.0.jar
+fabric/build/libs/visual_creative_tab_editor-fabric-1.21.1-1.0.0.jar
+neoforge/build/libs/visual_creative_tab_editor-neoforge-1.21.1-1.0.0.jar
+forge/build/libs/visual_creative_tab_editor-forge-1.21.1-1.0.0.jar
 ```
 
-Minecraft 26.2 使用 Java 25。Gradle toolchain resolver 可以在需要时提供配置的 JDK。
+Minecraft 1.21.1 使用 Java 21。Gradle toolchain resolver 可以在需要时提供配置的 JDK。
 
 ## License
 

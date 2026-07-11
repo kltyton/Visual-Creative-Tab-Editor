@@ -5,8 +5,8 @@ import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import net.fabricmc.fabric.impl.client.creativetab.FabricCreativeGuiComponents;
-import net.fabricmc.fabric.impl.creativetab.FabricCreativeModeTabImpl;
+import net.fabricmc.fabric.impl.client.itemgroup.FabricCreativeGuiComponents;
+import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.CreativeModeTab;
@@ -39,7 +39,7 @@ public final class FabricCreativeTabPages {
     public static synchronized void repack() {
         captureVanillaBaseline();
         List<CreativeModeTab> ordinary = CreativeTabRuntime.effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream())
-                .filter(tab -> !FabricCreativeGuiComponents.COMMON_TABS.contains(tab))
+                .filter(tab -> !FabricCreativeGuiComponents.COMMON_GROUPS.contains(tab))
                 .toList();
         int visibleIndex = 0;
         int hiddenIndex = 0;
@@ -48,13 +48,13 @@ public final class FabricCreativeTabPages {
             signature = 31 * signature + System.identityHashCode(tab);
             signature = 31 * signature + (tab.shouldDisplay() ? 1 : 0);
             if (!tab.shouldDisplay()) {
-                ((FabricCreativeModeTabImpl) tab).fabric_setPage(0);
+                ((FabricItemGroupImpl) tab).fabric_setPage(0);
                 tab.row = CreativeModeTab.Row.TOP;
                 tab.column = 7 + hiddenIndex++;
                 continue;
             }
-            int pageIndex = visibleIndex % FabricCreativeModeTabImpl.TABS_PER_PAGE;
-            ((FabricCreativeModeTabImpl) tab).fabric_setPage(visibleIndex / FabricCreativeModeTabImpl.TABS_PER_PAGE);
+            int pageIndex = visibleIndex % FabricItemGroupImpl.TABS_PER_PAGE;
+            ((FabricItemGroupImpl) tab).fabric_setPage(visibleIndex / FabricItemGroupImpl.TABS_PER_PAGE);
             tab.row = pageIndex < 5 ? CreativeModeTab.Row.TOP : CreativeModeTab.Row.BOTTOM;
             tab.column = pageIndex % 5;
             visibleIndex++;
@@ -66,8 +66,8 @@ public final class FabricCreativeTabPages {
                     ordinary.size(),
                     visibleIndex,
                     hiddenIndex,
-                    Math.max(1, (visibleIndex + FabricCreativeModeTabImpl.TABS_PER_PAGE - 1)
-                            / FabricCreativeModeTabImpl.TABS_PER_PAGE)
+                    Math.max(1, (visibleIndex + FabricItemGroupImpl.TABS_PER_PAGE - 1)
+                            / FabricItemGroupImpl.TABS_PER_PAGE)
             );
         }
     }
@@ -83,11 +83,11 @@ public final class FabricCreativeTabPages {
             return;
         }
         for (ResourceKey<CreativeModeTab> key : VANILLA_TABS) {
-            CreativeModeTab tab = BuiltInRegistries.CREATIVE_MODE_TAB.getValueOrThrow(key);
+            CreativeModeTab tab = BuiltInRegistries.CREATIVE_MODE_TAB.getOrThrow(key);
             VANILLA_BASELINE.put(tab, NativePosition.capture(tab));
             VisualCreativeTabEditorConstants.LOGGER.debug(
                     "[EditorTrace] fabric-vanilla-baseline-tab id={} row={} column={} page=0",
-                    key.identifier(),
+                    key.location(),
                     tab.row(),
                     tab.column()
             );
@@ -102,7 +102,7 @@ public final class FabricCreativeTabPages {
         private static NativePosition capture(CreativeModeTab tab) {
             /*
              * Fabric initializes its page field to -1 and fabric_getPage() deliberately throws until
-             * Fabric's buildAllTabContents TAIL injection has paginated the tabs for the first time.
+             * Fabric's updateEntries TAIL injection has paginated the tabs for the first time.
              * Every registered vanilla tab is assigned to page zero by that pagination pass, so the
              * pre-validation baseline must record only native row/column coordinates and restore page
              * zero without attempting to read the uninitialized field.
@@ -113,7 +113,7 @@ public final class FabricCreativeTabPages {
         private void apply(CreativeModeTab tab) {
             tab.row = this.row;
             tab.column = this.column;
-            ((FabricCreativeModeTabImpl) tab).fabric_setPage(0);
+            ((FabricItemGroupImpl) tab).fabric_setPage(0);
         }
     }
 }

@@ -1,27 +1,26 @@
 package com.kltyton.visual_creative_tab_editor.client;
 
-import com.kltyton.visual_creative_tab_editor.client.CreativeTabClientPlatform;
 import com.kltyton.visual_creative_tab_editor.network.CreativeTabNetworkBridge;
 import com.kltyton.visual_creative_tab_editor.network.EditResultPayload;
 import com.kltyton.visual_creative_tab_editor.network.SnapshotChunkPayload;
 import java.util.List;
+import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.gui.CreativeTabsScreenPage;
-import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
-import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
-/** Client-only NeoForge network bootstrap, loaded reflectively by the common NeoForge entrypoint. */
+/** Client-only NeoForge network, paging and connection bootstrap. */
 public final class VisualCreativeTabEditorNeoForgeClient {
     private VisualCreativeTabEditorNeoForgeClient() {
     }
 
     /** Registers client payload handlers and the client-to-server transport bridge. */
-    public static void register(IEventBus modEventBus) {
-        modEventBus.addListener(VisualCreativeTabEditorNeoForgeClient::registerPayloadHandlers);
+    public static void register() {
         NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditorNeoForgeClient::loggingOut);
-        CreativeTabNetworkBridge.installClientSender(ClientPacketDistributor::sendToServer);
+        CreativeTabNetworkBridge.installClientSender(PacketDistributor::sendToServer);
         CreativeTabClientPlatform.preserveNativeTabPositions();
         CreativeTabClientPlatform.installVisibleTabsProvider(screen -> screen.getCurrentPage().getVisibleTabs());
         CreativeTabClientPlatform.installTabRevealer((screen, tab) -> {
@@ -83,7 +82,7 @@ public final class VisualCreativeTabEditorNeoForgeClient {
         });
         CreativeTabClientPlatform.installScreenRefresher(screen -> {
             int pageIndex = Math.max(0, screen.pages.indexOf(screen.getCurrentPage()));
-            screen.resize(screen.width, screen.height);
+            screen.resize(Minecraft.getInstance(), screen.width, screen.height);
             List<CreativeTabsScreenPage> pages = screen.pages;
             if (!pages.isEmpty()) {
                 screen.setCurrentPage(pages.get(Math.min(pageIndex, pages.size() - 1)));
@@ -91,15 +90,26 @@ public final class VisualCreativeTabEditorNeoForgeClient {
         });
     }
 
-    private static void registerPayloadHandlers(RegisterClientPayloadHandlersEvent event) {
-        event.register(
+    /** Registers the clientbound codecs and handlers on the physical client. */
+    public static void registerPayloads(PayloadRegistrar registrar) {
+        registrar.playToClient(
                 SnapshotChunkPayload.TYPE,
-                (payload, context) -> CreativeTabClientState.handleSnapshotChunk(payload)
+                SnapshotChunkPayload.STREAM_CODEC,
+                VisualCreativeTabEditorNeoForgeClient::handleSnapshotChunk
         );
-        event.register(
+        registrar.playToClient(
                 EditResultPayload.TYPE,
-                (payload, context) -> CreativeTabClientState.handleEditResult(payload)
+                EditResultPayload.STREAM_CODEC,
+                VisualCreativeTabEditorNeoForgeClient::handleEditResult
         );
+    }
+
+    private static void handleSnapshotChunk(SnapshotChunkPayload payload, IPayloadContext context) {
+        CreativeTabClientState.handleSnapshotChunk(payload);
+    }
+
+    private static void handleEditResult(EditResultPayload payload, IPayloadContext context) {
+        CreativeTabClientState.handleEditResult(payload);
     }
 
     private static void loggingOut(ClientPlayerNetworkEvent.LoggingOut event) {

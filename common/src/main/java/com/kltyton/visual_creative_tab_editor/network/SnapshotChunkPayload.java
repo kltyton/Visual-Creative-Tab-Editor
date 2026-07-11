@@ -5,7 +5,7 @@ import io.netty.handler.codec.DecoderException;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** One bounded chunk of a server-authoritative creative-tab snapshot. */
 public record SnapshotChunkPayload(
@@ -17,7 +17,7 @@ public record SnapshotChunkPayload(
         byte[] chunk
 ) implements CustomPacketPayload {
     public static final Type<SnapshotChunkPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "snapshot_chunk")
+            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "snapshot_chunk")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SnapshotChunkPayload> STREAM_CODEC =

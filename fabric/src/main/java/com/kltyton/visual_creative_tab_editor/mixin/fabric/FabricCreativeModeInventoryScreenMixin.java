@@ -1,6 +1,6 @@
 package com.kltyton.visual_creative_tab_editor.mixin.fabric;
 
-import net.fabricmc.fabric.impl.client.creativetab.FabricCreativeGuiComponents;
+import net.fabricmc.fabric.impl.client.itemgroup.FabricCreativeGuiComponents;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

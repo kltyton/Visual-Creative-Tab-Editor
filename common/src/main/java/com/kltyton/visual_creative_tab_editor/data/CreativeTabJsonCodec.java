@@ -15,7 +15,7 @@ import net.minecraft.core.HolderOwner;
 import net.minecraft.core.Registry;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.ItemStack;
@@ -97,7 +97,7 @@ public final class CreativeTabJsonCodec {
                     readBooleanOptional(object, "can_scroll"),
                     readBooleanOptional(object, "show_title"),
                     readBooleanOptional(object, "aligned_right"),
-                    readIdentifier(object, "background")
+                    readResourceLocation(object, "background")
             );
         } catch (JsonParseException exception) {
             throw exception;
@@ -151,7 +151,7 @@ public final class CreativeTabJsonCodec {
     }
 
     /** Maps {@code data/<namespace>/creative_tabs/<path>.json} to {@code namespace:path}. */
-    public static Identifier tabIdFromResourceFile(Identifier resourceFile) {
+    public static ResourceLocation tabIdFromResourceFile(ResourceLocation resourceFile) {
         Objects.requireNonNull(resourceFile, "resourceFile");
         String prefix = DIRECTORY + "/";
         String path = resourceFile.getPath();
@@ -162,13 +162,13 @@ public final class CreativeTabJsonCodec {
         if (tabPath.isEmpty()) {
             throw new IllegalArgumentException("Creative tab resource has an empty path: " + resourceFile);
         }
-        return Identifier.fromNamespaceAndPath(resourceFile.getNamespace(), tabPath);
+        return ResourceLocation.fromNamespaceAndPath(resourceFile.getNamespace(), tabPath);
     }
 
     /** Maps a tab identifier to its data-resource file identifier. */
-    public static Identifier resourceFileFromTabId(Identifier tabId) {
+    public static ResourceLocation resourceFileFromTabId(ResourceLocation tabId) {
         Objects.requireNonNull(tabId, "tabId");
-        return Identifier.fromNamespaceAndPath(tabId.getNamespace(), DIRECTORY + "/" + tabId.getPath() + ".json");
+        return ResourceLocation.fromNamespaceAndPath(tabId.getNamespace(), DIRECTORY + "/" + tabId.getPath() + ".json");
     }
 
     private static Optional<List<ItemStack>> readItems(
@@ -214,13 +214,13 @@ public final class CreativeTabJsonCodec {
         }
     }
 
-    private static Optional<Identifier> readIdentifier(JsonObject object, String field) {
+    private static Optional<ResourceLocation> readResourceLocation(JsonObject object, String field) {
         if (!object.has(field)) {
             return Optional.empty();
         }
         String value = readString(object, field);
         try {
-            return Optional.of(Identifier.parse(value));
+            return Optional.of(ResourceLocation.parse(value));
         } catch (RuntimeException exception) {
             throw new JsonParseException(field + " is not a valid identifier: " + value, exception);
         }

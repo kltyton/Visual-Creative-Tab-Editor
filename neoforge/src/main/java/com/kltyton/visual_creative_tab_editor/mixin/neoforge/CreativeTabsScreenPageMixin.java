@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 import net.neoforged.neoforge.client.gui.CreativeTabsScreenPage;
 import org.spongepowered.asm.mixin.Mixin;
@@ -47,7 +47,7 @@ public abstract class CreativeTabsScreenPageMixin {
         for (int index = 0; index < ordered.size(); index++) {
             nativeOrder.put(ordered.get(index), index);
         }
-        Map<Identifier, Integer> configuredOrder = new HashMap<>();
+        Map<ResourceLocation, Integer> configuredOrder = new HashMap<>();
         var definitions = CreativeTabRuntime.catalog().orderedDefinitions();
         for (int index = 0; index < definitions.size(); index++) {
             configuredOrder.put(definitions.get(index).id(), index);

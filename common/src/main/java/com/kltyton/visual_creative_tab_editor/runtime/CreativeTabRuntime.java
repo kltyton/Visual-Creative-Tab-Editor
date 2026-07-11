@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
@@ -26,7 +26,7 @@ import net.minecraft.world.item.ItemStack;
 /** Thread-safe runtime projection of the current server-authoritative tab catalog. */
 public final class CreativeTabRuntime {
     private static final AtomicReference<State> ACTIVE = new AtomicReference<>(State.empty());
-    private static final AtomicReference<Map<Identifier, CreativeModeTab>> PREVIEW_HANDOFF = new AtomicReference<>();
+    private static final AtomicReference<Map<ResourceLocation, CreativeModeTab>> PREVIEW_HANDOFF = new AtomicReference<>();
     private static final ThreadLocal<State> PREVIEW = new ThreadLocal<>();
     private static final ThreadLocal<Integer> NATIVE_BYPASS = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<CreativeModeTab> FORCED_VISIBLE_TAB = new ThreadLocal<>();
@@ -35,7 +35,7 @@ public final class CreativeTabRuntime {
     }
 
     public static void install(CreativeTabCatalog catalog) {
-        Map<Identifier, CreativeModeTab> handoff = PREVIEW_HANDOFF.getAndSet(null);
+        Map<ResourceLocation, CreativeModeTab> handoff = PREVIEW_HANDOFF.getAndSet(null);
         ACTIVE.updateAndGet(previous -> State.create(catalog, previous, handoff));
         CreativeModeTabs.CACHED_PARAMETERS = null;
     }
@@ -111,13 +111,13 @@ public final class CreativeTabRuntime {
         }
     }
 
-    public static Optional<Identifier> id(CreativeModeTab tab) {
-        Identifier registered = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+    public static Optional<ResourceLocation> id(CreativeModeTab tab) {
+        ResourceLocation registered = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
         if (registered != null) {
             return Optional.of(registered);
         }
         State preview = PREVIEW.get();
-        Identifier previewId = preview == null ? null : preview.idsByRuntimeTab.get(tab);
+        ResourceLocation previewId = preview == null ? null : preview.idsByRuntimeTab.get(tab);
         return Optional.ofNullable(previewId != null ? previewId : ACTIVE.get().idsByRuntimeTab.get(tab));
     }
 
@@ -133,9 +133,9 @@ public final class CreativeTabRuntime {
             return nativeTabs;
         }
         List<CreativeModeTab> nativeList = nativeTabs.toList();
-        Map<Identifier, CreativeModeTab> byId = new LinkedHashMap<>();
+        Map<ResourceLocation, CreativeModeTab> byId = new LinkedHashMap<>();
         for (CreativeModeTab tab : nativeList) {
-            Identifier id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+            ResourceLocation id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
             if (id != null) {
                 byId.put(id, tab);
             }
@@ -187,8 +187,8 @@ public final class CreativeTabRuntime {
 
     private record State(
             CreativeTabCatalog catalog,
-            Map<Identifier, CreativeModeTab> runtimeTabs,
-            Map<CreativeModeTab, Identifier> idsByRuntimeTab
+            Map<ResourceLocation, CreativeModeTab> runtimeTabs,
+            Map<CreativeModeTab, ResourceLocation> idsByRuntimeTab
     ) {
         private static State empty() {
             return new State(CreativeTabCatalog.EMPTY, Map.of(), Map.of());
@@ -202,10 +202,10 @@ public final class CreativeTabRuntime {
         private static State create(
                 CreativeTabCatalog catalog,
                 State previous,
-                Map<Identifier, CreativeModeTab> handoff
+                Map<ResourceLocation, CreativeModeTab> handoff
         ) {
-            Map<Identifier, CreativeModeTab> runtime = new LinkedHashMap<>();
-            Map<CreativeModeTab, Identifier> reverse = new IdentityHashMap<>();
+            Map<ResourceLocation, CreativeModeTab> runtime = new LinkedHashMap<>();
+            Map<CreativeModeTab, ResourceLocation> reverse = new IdentityHashMap<>();
             for (CreativeTabDefinition definition : catalog.orderedDefinitions()) {
                 if (BuiltInRegistries.CREATIVE_MODE_TAB.getOptional(definition.id()).isPresent()
                         || definition.type() != CreativeTabType.CATEGORY) {

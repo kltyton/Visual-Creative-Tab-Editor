@@ -2,7 +2,6 @@ package com.kltyton.visual_creative_tab_editor.server;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
@@ -42,12 +41,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.metadata.pack.PackFormat;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.world.item.CreativeModeTab;
@@ -57,6 +54,8 @@ import net.minecraft.world.level.storage.LevelResource;
 
 /** Owns world-pack generation and the server-authoritative resolved catalog. */
 public final class CreativeTabServerManager {
+    /** Legacy command level matching 26.2's Permissions.COMMANDS_GAMEMASTER. */
+    private static final int GAMEMASTER_PERMISSION_LEVEL = 2;
     private static final Gson PRETTY_GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private static final AtomicLong REVISION = new AtomicLong();
     private static final Map<UUID, PendingEdit> PENDING_EDITS = new HashMap<>();
@@ -139,7 +138,7 @@ public final class CreativeTabServerManager {
         try {
             byte[] bytes = encodeSnapshotBundle(base, resolved, registries());
             List<byte[]> chunks = PayloadChunks.compressAndSplit(bytes);
-            boolean canEdit = player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+            boolean canEdit = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
             long revision = REVISION.get();
             for (int index = 0; index < chunks.size(); index++) {
                 CreativeTabNetworkBridge.sendToPlayer(player, new SnapshotChunkPayload(
@@ -158,7 +157,7 @@ public final class CreativeTabServerManager {
     }
 
     public static void handleEditChunk(ServerPlayer player, EditChunkPayload payload) {
-        if (!player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+        if (!player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL)) {
             if (payload.index() == 0) {
                 reject(player, payload.sessionId(), "visual_creative_tab_editor.edit.permission_denied");
             }
@@ -172,7 +171,7 @@ public final class CreativeTabServerManager {
             return;
         }
 
-        long now = net.minecraft.util.Util.getMillis();
+        long now = net.minecraft.Util.getMillis();
         PENDING_EDITS.entrySet().removeIf(entry -> now - entry.getValue().createdAt > 30_000L);
         UUID playerId = player.getUUID();
         PendingEdit pending = PENDING_EDITS.get(playerId);
@@ -243,7 +242,7 @@ public final class CreativeTabServerManager {
                     pending.sessionId,
                     true,
                     REVISION.get(),
-                    player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER),
+                    player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL),
                     net.minecraft.network.chat.Component.translatable("visual_creative_tab_editor.edit.saved")
             ));
         } catch (Exception exception) {
@@ -269,7 +268,7 @@ public final class CreativeTabServerManager {
         }
         permissionCheckTicks = 0;
         for (ServerPlayer player : target.getPlayerList().getPlayers()) {
-            boolean current = player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+            boolean current = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
             Boolean previous = EDIT_PERMISSION_STATE.get(player.getUUID());
             if (previous == null || previous != current) {
                 syncTo(player);
@@ -315,7 +314,7 @@ public final class CreativeTabServerManager {
                 sessionId,
                 false,
                 REVISION.get(),
-                player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER),
+                player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL),
                 net.minecraft.network.chat.Component.translatable(translationKey)
         ));
     }
@@ -400,7 +399,7 @@ public final class CreativeTabServerManager {
                     ? CreativeTabPatch.full(targetDefinition)
                     : CreativeTabPatch.diff(baseDefinition, targetDefinition);
             if (!patch.isEmpty()) {
-                Identifier file = CreativeTabJsonCodec.resourceFileFromTabId(targetDefinition.id());
+                ResourceLocation file = CreativeTabJsonCodec.resourceFileFromTabId(targetDefinition.id());
                 Path relative = Path.of("data", file.getNamespace(), file.getPath());
                 documents.put(relative, PRETTY_GSON.toJson(CreativeTabJsonCodec.encodePatch(patch, registries())) + "\n");
             }
@@ -435,7 +434,7 @@ public final class CreativeTabServerManager {
                 int order = 0;
                 List<CreativeModeTab> nativeOrder = CreativeTabNativeOrder.apply(registryTabs);
                 for (CreativeModeTab tab : nativeOrder) {
-                    Identifier id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+                    ResourceLocation id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
                     if (id == null) {
                         continue;
                     }
@@ -473,7 +472,7 @@ public final class CreativeTabServerManager {
     private static Map<Path, String> fullDocuments(CreativeTabCatalog catalog, HolderLookup.Provider lookup) {
         Map<Path, String> documents = new LinkedHashMap<>();
         for (CreativeTabDefinition definition : catalog.orderedDefinitions()) {
-            Identifier file = CreativeTabJsonCodec.resourceFileFromTabId(definition.id());
+            ResourceLocation file = CreativeTabJsonCodec.resourceFileFromTabId(definition.id());
             Path relative = Path.of("data", file.getNamespace(), file.getPath());
             documents.put(relative, PRETTY_GSON.toJson(CreativeTabJsonCodec.encodeDefinition(definition, lookup)) + "\n");
         }
@@ -580,14 +579,9 @@ public final class CreativeTabServerManager {
     }
 
     private static String packMetadata(String description) {
-        PackFormat format = SharedConstants.getCurrentVersion().packVersion(PackType.SERVER_DATA);
-        JsonArray encodedFormat = new JsonArray();
-        encodedFormat.add(format.major());
-        encodedFormat.add(format.minor());
         JsonObject pack = new JsonObject();
         pack.addProperty("description", description);
-        pack.add("min_format", encodedFormat.deepCopy());
-        pack.add("max_format", encodedFormat.deepCopy());
+        pack.addProperty("pack_format", SharedConstants.getCurrentVersion().getPackVersion(PackType.SERVER_DATA));
         JsonObject root = new JsonObject();
         root.add("pack", pack);
         return PRETTY_GSON.toJson(root) + "\n";

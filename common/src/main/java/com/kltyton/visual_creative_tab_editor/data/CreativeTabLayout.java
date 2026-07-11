@@ -1,6 +1,6 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 
 import java.util.Objects;
@@ -10,7 +10,7 @@ public record CreativeTabLayout(
         boolean canScroll,
         boolean showTitle,
         boolean alignedRight,
-        Identifier background
+        ResourceLocation background
 ) {
     /** Vanilla's default category-tab layout. */
     public static final CreativeTabLayout DEFAULT = new CreativeTabLayout(

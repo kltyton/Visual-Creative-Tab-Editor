@@ -4,11 +4,12 @@ import com.kltyton.visual_creative_tab_editor.network.CreativeTabNetworkBridge;
 import com.kltyton.visual_creative_tab_editor.network.EditChunkPayload;
 import com.kltyton.visual_creative_tab_editor.network.EditResultPayload;
 import com.kltyton.visual_creative_tab_editor.network.SnapshotChunkPayload;
+import com.kltyton.visual_creative_tab_editor.client.VisualCreativeTabEditorNeoForgeClient;
 import com.kltyton.visual_creative_tab_editor.server.CreativeTabReloadListener;
 import com.kltyton.visual_creative_tab_editor.server.CreativeTabServerManager;
 import com.kltyton.visual_creative_tab_editor.platform.CreativeTabNativeOrder;
 import java.util.ArrayList;
-import net.minecraft.resources.Identifier;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -17,7 +18,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.CreativeModeTabRegistry;
-import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
+import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -25,16 +26,13 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 /** NeoForge loader entrypoint. */
 @Mod(VisualCreativeTabEditorConstants.MOD_ID)
 public final class VisualCreativeTabEditor {
     private static final String NETWORK_VERSION = "2";
-    private static final Identifier RELOAD_LISTENER_ID = Identifier.fromNamespaceAndPath(
-            VisualCreativeTabEditorConstants.MOD_ID,
-            "creative_tabs"
-    );
-
     /** Creates and initializes the NeoForge mod entrypoint. */
     public VisualCreativeTabEditor(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(VisualCreativeTabEditor::registerPayloads);
@@ -58,27 +56,47 @@ public final class VisualCreativeTabEditor {
             }
             return ordered;
         });
-        if (FMLEnvironment.getDist() == Dist.CLIENT) {
-            registerClient(modEventBus);
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            registerClient();
         }
 
         VisualCreativeTabEditorCommon.initialize();
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        event.registrar(NETWORK_VERSION)
-                .playToClient(SnapshotChunkPayload.TYPE, SnapshotChunkPayload.STREAM_CODEC)
-                .playToClient(EditResultPayload.TYPE, EditResultPayload.STREAM_CODEC)
-                .playToServer(
-                        EditChunkPayload.TYPE,
-                        EditChunkPayload.STREAM_CODEC,
-                        (payload, context) -> CreativeTabServerManager.handleEditChunk((ServerPlayer) context.player(), payload)
-                );
+        PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            VisualCreativeTabEditorNeoForgeClient.registerPayloads(registrar);
+        } else {
+            registrar.playToClient(
+                    SnapshotChunkPayload.TYPE,
+                    SnapshotChunkPayload.STREAM_CODEC,
+                    VisualCreativeTabEditor::rejectMisroutedClientboundPayload
+            );
+            registrar.playToClient(
+                    EditResultPayload.TYPE,
+                    EditResultPayload.STREAM_CODEC,
+                    VisualCreativeTabEditor::rejectMisroutedClientboundPayload
+            );
+        }
+        registrar.playToServer(
+                EditChunkPayload.TYPE,
+                EditChunkPayload.STREAM_CODEC,
+                (payload, context) -> CreativeTabServerManager.handleEditChunk((ServerPlayer) context.player(), payload)
+        );
     }
 
-    @SuppressWarnings("removal")
-    private static void addServerReloadListeners(AddServerReloadListenersEvent event) {
-        event.addListener(RELOAD_LISTENER_ID, new CreativeTabReloadListener(event.getRegistryAccess()));
+    private static void rejectMisroutedClientboundPayload(
+            CustomPacketPayload payload,
+            IPayloadContext context
+    ) {
+        throw new IllegalStateException(
+                "Clientbound payload " + payload.type().id() + " was delivered on a dedicated server"
+        );
+    }
+
+    private static void addServerReloadListeners(AddReloadListenerEvent event) {
+        event.addListener(new CreativeTabReloadListener(event.getRegistryAccess()));
     }
 
     private static void serverStarted(ServerStartedEvent event) {
@@ -103,13 +121,7 @@ public final class VisualCreativeTabEditor {
         CreativeTabServerManager.refreshEditPermissions(event.getServer());
     }
 
-    private static void registerClient(IEventBus modEventBus) {
-        try {
-            Class.forName("com.kltyton.visual_creative_tab_editor.client.VisualCreativeTabEditorNeoForgeClient")
-                    .getMethod("register", IEventBus.class)
-                    .invoke(null, modEventBus);
-        } catch (ReflectiveOperationException exception) {
-            throw new IllegalStateException("Failed to register Visual Creative Tab Editor NeoForge client hooks", exception);
-        }
+    private static void registerClient() {
+        VisualCreativeTabEditorNeoForgeClient.register();
     }
 }

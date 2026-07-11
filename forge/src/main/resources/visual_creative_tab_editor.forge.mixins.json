@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.kltyton.visual_creative_tab_editor.mixin.forge",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CreativeModeTabRegistryMixin"
+  ],
+  "client": [
+    "CreativeTabsScreenPageMixin"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

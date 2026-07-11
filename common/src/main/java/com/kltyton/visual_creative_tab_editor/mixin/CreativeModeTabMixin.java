@@ -7,7 +7,7 @@ import java.util.Collection;
 import java.util.Set;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -38,7 +38,7 @@ public abstract class CreativeModeTabMixin {
     }
 
     @Inject(method = "getBackgroundTexture", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$getBackground(CallbackInfoReturnable<Identifier> callback) {
+    private void visualCreativeTabEditor$getBackground(CallbackInfoReturnable<ResourceLocation> callback) {
         CreativeTabRuntime.definition((CreativeModeTab) (Object) this)
                 .ifPresent(definition -> callback.setReturnValue(definition.layout().background()));
     }
@@ -103,7 +103,7 @@ public abstract class CreativeModeTabMixin {
         callback.cancel();
     }
 
-    @Inject(method = "buildContents", at = @At("TAIL"), order = 1100)
+    @Inject(method = "buildContents", at = @At("TAIL"))
     private void visualCreativeTabEditor$applyRegisteredTabContents(
             CreativeModeTab.ItemDisplayParameters parameters,
             CallbackInfo callback
@@ -137,7 +137,7 @@ public abstract class CreativeModeTabMixin {
 
     private boolean isOperatorUtilities() {
         return CreativeTabRuntime.id((CreativeModeTab) (Object) this)
-                .filter(id -> id.equals(Identifier.withDefaultNamespace("op_blocks")))
+                .filter(id -> id.equals(ResourceLocation.withDefaultNamespace("op_blocks")))
                 .isPresent();
     }
 }

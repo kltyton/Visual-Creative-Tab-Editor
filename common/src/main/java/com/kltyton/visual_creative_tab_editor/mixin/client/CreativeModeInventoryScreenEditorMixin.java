@@ -10,24 +10,20 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.PreeditEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
-import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -42,9 +38,13 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         extends AbstractContainerScreen<CreativeModeInventoryScreen.ItemPickerMenu>
         implements CreativeTabEditorHost {
     @Unique
+    private static final float visualCreativeTabEditor$OVERLAY_Z = 500.0F;
+    @Unique
     private CreativeTabEditorController visualCreativeTabEditor$editor;
     @Unique
     private @Nullable EditBox visualCreativeTabEditor$titleEditor;
+    @Unique
+    private boolean visualCreativeTabEditor$renderLayerTraceLogged;
 
     protected CreativeModeInventoryScreenEditorMixin(
             CreativeModeInventoryScreen.ItemPickerMenu menu,
@@ -69,11 +69,12 @@ public abstract class CreativeModeInventoryScreenEditorMixin
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$mouseClicked(
-            MouseButtonEvent event,
-            boolean doubleClick,
+            double mouseX,
+            double mouseY,
+            int button,
             CallbackInfoReturnable<Boolean> callback
     ) {
-        if (this.visualCreativeTabEditor$editor().mouseClicked(event, doubleClick)) {
+        if (this.visualCreativeTabEditor$editor().mouseClicked(mouseX, mouseY, button)) {
             callback.setReturnValue(true);
         }
     }
@@ -83,7 +84,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
             @Nullable Slot slot,
             int slotId,
             int button,
-            ContainerInput input,
+            ClickType input,
             CallbackInfo callback
     ) {
         if (this.visualCreativeTabEditor$editor().slotClicked(slot, slotId, button, input)) {
@@ -93,12 +94,14 @@ public abstract class CreativeModeInventoryScreenEditorMixin
 
     @Inject(method = "mouseDragged", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$mouseDragged(
-            MouseButtonEvent event,
+            double mouseX,
+            double mouseY,
+            int button,
             double deltaX,
             double deltaY,
             CallbackInfoReturnable<Boolean> callback
     ) {
-        if (this.visualCreativeTabEditor$editor().mouseDragged(event, deltaX, deltaY)) {
+        if (this.visualCreativeTabEditor$editor().mouseDragged(mouseX, mouseY, button, deltaX, deltaY)) {
             callback.setReturnValue(true);
         }
     }
@@ -118,31 +121,61 @@ public abstract class CreativeModeInventoryScreenEditorMixin
 
     @Inject(method = "mouseReleased", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$mouseReleasedHead(
-            MouseButtonEvent event,
+            double mouseX,
+            double mouseY,
+            int button,
             CallbackInfoReturnable<Boolean> callback
     ) {
-        if (this.visualCreativeTabEditor$editor().mouseReleased(event)) {
+        if (this.visualCreativeTabEditor$editor().mouseReleased(mouseX, mouseY, button)) {
             callback.setReturnValue(true);
         }
     }
 
     @Inject(method = "mouseReleased", at = @At("RETURN"))
     private void visualCreativeTabEditor$mouseReleasedReturn(
-            MouseButtonEvent event,
+            double mouseX,
+            double mouseY,
+            int button,
             CallbackInfoReturnable<Boolean> callback
     ) {
-        this.visualCreativeTabEditor$editor().afterMouseReleased(event);
+        this.visualCreativeTabEditor$editor().afterMouseReleased(mouseX, mouseY, button);
     }
 
-    @Inject(method = "extractRenderState", at = @At("TAIL"))
-    private void visualCreativeTabEditor$extractEditor(
-            GuiGraphicsExtractor graphics,
+    @Inject(method = "render", at = @At("TAIL"))
+    private void visualCreativeTabEditor$renderEditor(
+            GuiGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick,
             CallbackInfo callback
     ) {
-        this.visualCreativeTabEditor$editor().extractRenderState(graphics, mouseX, mouseY, partialTick);
+        CreativeTabEditorController editor = this.visualCreativeTabEditor$editor();
+        if (!editor.prepareRender(mouseX, mouseY)) {
+            this.visualCreativeTabEditor$renderLayerTraceLogged = false;
+            return;
+        }
+
+        float basePoseZ = graphics.pose().last().pose().m32();
+        graphics.flush();
+        graphics.pose().pushPose();
+        try {
+            graphics.pose().translate(0.0F, 0.0F, visualCreativeTabEditor$OVERLAY_Z);
+            float overlayPoseZ = graphics.pose().last().pose().m32();
+            if (!this.visualCreativeTabEditor$renderLayerTraceLogged) {
+                VisualCreativeTabEditorConstants.LOGGER.info(
+                        "[EditorTrace] render-layer-pass basePoseZ={} overlayPoseZ={} translation={} "
+                                + "vanillaTooltipZ=400 flushBefore=true flushAfter=true",
+                        basePoseZ,
+                        overlayPoseZ,
+                        visualCreativeTabEditor$OVERLAY_Z
+                );
+                this.visualCreativeTabEditor$renderLayerTraceLogged = true;
+            }
+            editor.renderOverlay(graphics, mouseX, mouseY, partialTick);
+            graphics.flush();
+        } finally {
+            graphics.pose().popPose();
+        }
     }
 
     @Inject(method = "selectTab", at = @At("HEAD"), cancellable = true)
@@ -197,12 +230,12 @@ public abstract class CreativeModeInventoryScreenEditorMixin
                 : CreativeTabRuntime.id(tab).map(Object::toString).orElse("<unregistered>");
     }
 
-    @Inject(method = "extractBackground", at = @At("HEAD"))
+    @Inject(method = "renderBg", at = @At("HEAD"))
     private void visualCreativeTabEditor$arrangeDataDrivenTabs(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
+            float partialTick,
             int mouseX,
             int mouseY,
-            float partialTick,
             CallbackInfo callback
     ) {
         if (CreativeTabRuntime.catalog().isEmpty() || CreativeTabClientPlatform.preservesNativeTabPositions()) {
@@ -256,7 +289,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         for (int index = 0; index < visible.size(); index++) {
             nativeOrder.put(visible.get(index), index);
         }
-        Map<net.minecraft.resources.Identifier, Integer> configuredOrder = new HashMap<>();
+        Map<net.minecraft.resources.ResourceLocation, Integer> configuredOrder = new HashMap<>();
         var definitions = CreativeTabRuntime.catalog().orderedDefinitions();
         for (int index = 0; index < definitions.size(); index++) {
             configuredOrder.put(definitions.get(index).id(), index);
@@ -281,7 +314,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
 
     @Inject(method = "checkTabHovering", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$suppressTabTooltip(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             CreativeModeTab tab,
             int mouseX,
             int mouseY,
@@ -293,25 +326,24 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     }
 
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$keyPressed(KeyEvent event, CallbackInfoReturnable<Boolean> callback) {
-        if (this.visualCreativeTabEditor$editor().keyPressed(event)) {
+    private void visualCreativeTabEditor$keyPressed(
+            int keyCode,
+            int scanCode,
+            int modifiers,
+            CallbackInfoReturnable<Boolean> callback
+    ) {
+        if (this.visualCreativeTabEditor$editor().keyPressed(keyCode, scanCode, modifiers)) {
             callback.setReturnValue(true);
         }
     }
 
     @Inject(method = "charTyped", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$charTyped(CharacterEvent event, CallbackInfoReturnable<Boolean> callback) {
-        if (this.visualCreativeTabEditor$editor().charTyped(event)) {
-            callback.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "preeditUpdated", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$preeditUpdated(
-            @Nullable PreeditEvent event,
+    private void visualCreativeTabEditor$charTyped(
+            char codePoint,
+            int modifiers,
             CallbackInfoReturnable<Boolean> callback
     ) {
-        if (this.visualCreativeTabEditor$editor().preeditUpdated(event)) {
+        if (this.visualCreativeTabEditor$editor().charTyped(codePoint, modifiers)) {
             callback.setReturnValue(true);
         }
     }
@@ -494,55 +526,51 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     }
 
     @Override
-    public void visualCreativeTabEditor$extractTitleEditor(
-            GuiGraphicsExtractor graphics,
+    public void visualCreativeTabEditor$renderTitleEditor(
+            GuiGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick
     ) {
         if (this.visualCreativeTabEditor$titleEditor != null && this.visualCreativeTabEditor$titleEditor.visible) {
-            this.visualCreativeTabEditor$titleEditor.extractRenderState(graphics, mouseX, mouseY, partialTick);
+            this.visualCreativeTabEditor$titleEditor.render(graphics, mouseX, mouseY, partialTick);
         }
     }
 
     @Override
-    public boolean visualCreativeTabEditor$titleEditorKeyPressed(KeyEvent event) {
+    public boolean visualCreativeTabEditor$titleEditorKeyPressed(int keyCode, int scanCode, int modifiers) {
         return this.visualCreativeTabEditor$titleEditor != null
-                && this.visualCreativeTabEditor$titleEditor.keyPressed(event);
+                && this.visualCreativeTabEditor$titleEditor.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean visualCreativeTabEditor$titleEditorCharTyped(CharacterEvent event) {
+    public boolean visualCreativeTabEditor$titleEditorCharTyped(char codePoint, int modifiers) {
         return this.visualCreativeTabEditor$titleEditor != null
-                && this.visualCreativeTabEditor$titleEditor.charTyped(event);
-    }
-
-    @Override
-    public boolean visualCreativeTabEditor$titleEditorPreeditUpdated(@Nullable PreeditEvent event) {
-        return this.visualCreativeTabEditor$titleEditor != null
-                && this.visualCreativeTabEditor$titleEditor.preeditUpdated(event);
+                && this.visualCreativeTabEditor$titleEditor.charTyped(codePoint, modifiers);
     }
 
     @Override
     public boolean visualCreativeTabEditor$titleEditorMouseDragged(
-            MouseButtonEvent event,
+            double mouseX,
+            double mouseY,
+            int button,
             double deltaX,
             double deltaY
     ) {
         return this.visualCreativeTabEditor$titleEditor != null
                 && this.isDragging()
                 && this.getFocused() == this.visualCreativeTabEditor$titleEditor
-                && this.visualCreativeTabEditor$titleEditor.mouseDragged(event, deltaX, deltaY);
+                && this.visualCreativeTabEditor$titleEditor.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
     }
 
     @Override
-    public boolean visualCreativeTabEditor$titleEditorMouseReleased(MouseButtonEvent event) {
+    public boolean visualCreativeTabEditor$titleEditorMouseReleased(double mouseX, double mouseY, int button) {
         boolean titleWasDragging = this.isDragging()
                 && this.getFocused() == this.visualCreativeTabEditor$titleEditor;
         this.setDragging(false);
         return titleWasDragging
                 && this.visualCreativeTabEditor$titleEditor != null
-                && this.visualCreativeTabEditor$titleEditor.mouseReleased(event);
+                && this.visualCreativeTabEditor$titleEditor.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
@@ -561,7 +589,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     }
 
     @Override
-    public void visualCreativeTabEditor$replaySlotClick(Slot slot, int slotId, int button, ContainerInput input) {
+    public void visualCreativeTabEditor$replaySlotClick(Slot slot, int slotId, int button, ClickType input) {
         this.slotClicked(slot, slotId, button, input);
     }
 

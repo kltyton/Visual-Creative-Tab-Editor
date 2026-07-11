@@ -9,7 +9,8 @@ import com.kltyton.visual_creative_tab_editor.network.SnapshotChunkPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.creativetab.v1.FabricCreativeModeInventoryScreen;
+import net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScreen;
+import net.minecraft.client.Minecraft;
 
 /** Fabric physical-client entrypoint. */
 public final class VisualCreativeTabEditorClient implements ClientModInitializer {
@@ -28,18 +29,18 @@ public final class VisualCreativeTabEditorClient implements ClientModInitializer
         CreativeTabClientPlatform.preserveNativeTabPositions();
         CreativeTabClientPlatform.installTabLayoutRefresher(FabricCreativeTabPages::repack);
         CreativeTabClientPlatform.installVisibleTabsProvider(screen -> {
-            FabricCreativeModeInventoryScreen fabricScreen = (FabricCreativeModeInventoryScreen) screen;
-            return fabricScreen.getTabsOnPage(fabricScreen.getCurrentPage());
+            FabricCreativeInventoryScreen fabricScreen = (FabricCreativeInventoryScreen) screen;
+            return fabricScreen.getItemGroupsOnPage(fabricScreen.getCurrentPage());
         });
         CreativeTabClientPlatform.installTabRevealer((screen, tab) -> {
-            FabricCreativeModeInventoryScreen fabricScreen = (FabricCreativeModeInventoryScreen) screen;
+            FabricCreativeInventoryScreen fabricScreen = (FabricCreativeInventoryScreen) screen;
             int targetPage = fabricScreen.getPage(tab);
             return fabricScreen.getCurrentPage() == targetPage || fabricScreen.switchToPage(targetPage);
         });
         CreativeTabClientPlatform.installScreenRefresher(screen -> {
-            FabricCreativeModeInventoryScreen fabricScreen = (FabricCreativeModeInventoryScreen) screen;
+            FabricCreativeInventoryScreen fabricScreen = (FabricCreativeInventoryScreen) screen;
             int pageBeforeResize = fabricScreen.getCurrentPage();
-            screen.resize(screen.width, screen.height);
+            screen.resize(Minecraft.getInstance(), screen.width, screen.height);
             int pageCount = Math.max(1, fabricScreen.getPageCount());
             int targetPage = Math.clamp(pageBeforeResize, 0, pageCount - 1);
             int pageAfterResize = fabricScreen.getCurrentPage();
@@ -60,7 +61,7 @@ public final class VisualCreativeTabEditorClient implements ClientModInitializer
         CreativeTabClientPlatform.installPageNavigator(new CreativeTabClientPlatform.PageNavigator() {
             @Override
             public CreativeTabClientPlatform.PageState state(net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen screen) {
-                FabricCreativeModeInventoryScreen fabricScreen = (FabricCreativeModeInventoryScreen) screen;
+                FabricCreativeInventoryScreen fabricScreen = (FabricCreativeInventoryScreen) screen;
                 int count = Math.max(1, fabricScreen.getPageCount());
                 int current = fabricScreen.getCurrentPage();
                 if (current < 0 || current >= count) {
@@ -79,7 +80,7 @@ public final class VisualCreativeTabEditorClient implements ClientModInitializer
                     net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen screen,
                     int targetIndex
             ) {
-                FabricCreativeModeInventoryScreen fabricScreen = (FabricCreativeModeInventoryScreen) screen;
+                FabricCreativeInventoryScreen fabricScreen = (FabricCreativeInventoryScreen) screen;
                 return fabricScreen.getCurrentPage() == targetIndex || fabricScreen.switchToPage(targetIndex);
             }
         });

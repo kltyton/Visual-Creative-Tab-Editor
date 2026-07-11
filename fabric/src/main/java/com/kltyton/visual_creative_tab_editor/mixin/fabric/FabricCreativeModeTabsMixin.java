@@ -21,7 +21,7 @@ public abstract class FabricCreativeModeTabsMixin {
 
     // Fabric's own paginator uses the default injector order (1000) and validates registered tabs.
     // Runtime-only tabs are repacked afterwards because Fabric cannot see them in the registry.
-    @Inject(method = "buildAllTabContents", at = @At("TAIL"), order = 1100)
+    @Inject(method = "buildAllTabContents", at = @At("TAIL"))
     private static void visualCreativeTabEditor$repackFabricPages(
             CreativeModeTab.ItemDisplayParameters parameters,
             CallbackInfo callback

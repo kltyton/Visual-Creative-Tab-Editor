@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server acknowledgement for one completed edit transaction. */
 public record EditResultPayload(
@@ -20,7 +20,7 @@ public record EditResultPayload(
         Component message
 ) implements CustomPacketPayload {
     public static final Type<EditResultPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_result")
+            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_result")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, EditResultPayload> STREAM_CODEC =

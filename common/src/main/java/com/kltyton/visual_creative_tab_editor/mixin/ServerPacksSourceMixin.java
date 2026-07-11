@@ -2,7 +2,10 @@ package com.kltyton.visual_creative_tab_editor.mixin;
 
 import com.kltyton.visual_creative_tab_editor.pack.PinnedWorldPackSource;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.RepositorySource;
 import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.world.level.validation.DirectoryValidator;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,6 +22,8 @@ public abstract class ServerPacksSourceMixin {
             CallbackInfoReturnable<PackRepository> callback
     ) {
         PackRepository original = callback.getReturnValue();
-        original.sources.add(new PinnedWorldPackSource(datapackDirectory));
+        List<RepositorySource> sources = new ArrayList<>(original.sources);
+        sources.add(new PinnedWorldPackSource(datapackDirectory));
+        callback.setReturnValue(new PackRepository(sources.toArray(RepositorySource[]::new)));
     }
 }
