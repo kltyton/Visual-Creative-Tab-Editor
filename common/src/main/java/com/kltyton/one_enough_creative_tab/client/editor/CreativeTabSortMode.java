@@ -14,7 +14,7 @@ import java.util.Objects;
 
 /** Stable item ordering modes offered by the creative-tab editor. */
 public enum CreativeTabSortMode {
-    /** Sorts by the concrete item implementation class, then by registry id. */
+    /** Sorts by caller-provided semantic creative groups, then by registry id. */
     TYPE,
     /** Sorts by the registry path, ignoring its namespace until tie-breaking. */
     ID_PATH,

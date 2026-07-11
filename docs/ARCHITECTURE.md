@@ -1,0 +1,54 @@
+# Architecture
+
+The built-in creative-tab registry remains frozen. Registered vanilla and modded
+tab objects keep their identity, while a reloadable immutable catalog supplies
+their title, icon, visibility, order, layout, and contents. JSON-only category
+tabs are runtime objects outside the registry and are projected into Fabric and
+NeoForge's native page implementations.
+
+## Server flow
+
+1. A new world starts with native creative tabs as a safe fallback.
+2. At `SERVER_STARTED`, native contents are rebuilt while this mod's projection
+   is bypassed. This captures Fabric/NeoForge tab events and other mods' final
+   contributions.
+3. The resulting definitions are written to the pinned lowest pack with
+   per-file atomic replacement, and obsolete JSON files are removed.
+4. The pack repository is refreshed and resources are reloaded once if content
+   changed.
+5. Reloaded resources are merged by pack stack and synchronized to clients.
+
+The snapshot contains both the non-player base and the effective result. The
+editor sends a bounded, compressed target catalog. The server checks operator
+permission, revision, identifiers, limits, tab types, and item stacks before
+writing a minimal highest-layer difference pack.
+
+## Network limits
+
+Both directions use 24 KiB chunks and GZIP. Logical payloads are limited to 171
+chunks, 4 MiB compressed, and 16 MiB expanded. A resource reload is rejected if
+the combined base-and-resolved snapshot cannot fit those wire limits.
+Client-to-server data never contains a filesystem path or arbitrary output
+filename.
+
+## Client flow
+
+The creative screen holds a draft catalog during editing. Preview state is
+thread-local to the render thread, which avoids leaking an integrated-server
+preview into the logical server. Saving submits the draft; canceling discards it.
+Fabric and NeoForge keep their own native pagination, with thin loader-specific
+ordering adapters.
+
+## Access policy
+
+Members that only need wider Java access use loader-native transformation:
+
+- Fabric Loader 0.19 / Loom 1.16 reads
+  `one_enough_creative_tab.classtweaker`;
+- NeoForge reads the common `META-INF/accesstransformer.cfg` plus the
+  NeoForge-only `META-INF/neoforge-accesstransformer.cfg` for its patched page
+  list.
+
+Mixin accessors and invokers are not used. Mixins remain only where behavior
+must change, such as data-driven method results, input interception, creative
+cache rebuild hooks, and the virtual item-tail row calculation.
