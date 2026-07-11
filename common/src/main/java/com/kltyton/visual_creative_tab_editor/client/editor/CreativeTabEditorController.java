@@ -6,6 +6,7 @@ import com.kltyton.visual_creative_tab_editor.client.CreativeTabClientState;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabCatalog;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabDefinition;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
+import com.kltyton.visual_creative_tab_editor.data.CreativeTabValidation;
 import com.kltyton.visual_creative_tab_editor.network.EditResultPayload;
 import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackLinkedSet;
 import net.minecraft.world.item.Item;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -251,14 +253,29 @@ public final class CreativeTabEditorController {
                 }
             }
             Slot slot = creativeSlotAt(event.x(), event.y());
-            if (slot != null && slot.hasItem() && currentType() == CreativeTabType.CATEGORY) {
-                int absolute = absoluteItemIndex(slot);
-                if (absolute >= 0 && absolute < draft().currentItems().size()) {
-                    this.contextItemIndex = absolute;
-                    this.press = Press.item(PressKind.EDIT_ITEM, slot, absolute, event.x(), event.y());
+            if (slot != null && slot.hasItem() && canReorderCurrentItems()) {
+                ensureSearchOrderPrepared(this.host.visualCreativeTabEditor$selectedTab(), "edit-item-press");
+                int itemIndex = itemIndexForSlot(slot);
+                int draftItems = currentItemCount();
+                boolean accepted = itemIndex >= 0 && itemIndex < draftItems;
+                trace(
+                        "item-press-map type={} slotIndex={} mappedIndex={} menuItems={} visibleItems={} draftItems={} accepted={} reason={}",
+                        currentType(),
+                        slot.index,
+                        itemIndex,
+                        this.host.visualCreativeTabEditor$menu().items.size(),
+                        this.host.visualCreativeTabEditor$selectedTab().getDisplayItems().size(),
+                        draftItems,
+                        accepted,
+                        accepted ? "ok" : "outside-persistable-search-prefix"
+                );
+                if (accepted) {
+                    this.contextItemIndex = itemIndex;
+                    this.press = Press.item(PressKind.EDIT_ITEM, slot, itemIndex, event.x(), event.y());
                     tracePressStart(this.press);
                     return true;
                 }
+                return true;
             }
             saveAndExit();
             return true;
@@ -456,7 +473,21 @@ public final class CreativeTabEditorController {
         }
         if ((active.kind == PressKind.EDIT_ITEM
                 || (active.kind == PressKind.NORMAL_ITEM && active.longTriggered))
-                && currentType() == CreativeTabType.CATEGORY) {
+                && canReorderCurrentItems()) {
+            if (active.itemIndex < 0) {
+                if (!active.dragBlockedLogged) {
+                    active.dragBlockedLogged = true;
+                    trace(
+                            "drag-dispatch type={} kind={} selectedItems={} target=-1 blockedReason=outside-persistable-search-prefix menuItems={} visibleItems={}",
+                            currentType(),
+                            active.kind,
+                            draft().selectedItemIndices().size(),
+                            this.host.visualCreativeTabEditor$menu().items.size(),
+                            this.host.visualCreativeTabEditor$selectedTab().getDisplayItems().size()
+                    );
+                }
+                return true;
+            }
             if (this.mode != Mode.DRAG_ITEMS && !draft().selectedItemIndices().contains(active.itemIndex)) {
                 draft().clearItemSelection();
                 draft().setItemSelected(active.itemIndex, true);
@@ -470,8 +501,20 @@ public final class CreativeTabEditorController {
             if (target >= 0 && target != this.lastDragTarget) {
                 int row = this.host.visualCreativeTabEditor$menu()
                         .getRowIndexForScroll(this.host.visualCreativeTabEditor$scrollOffset());
-                draft().moveSelectedItems(target);
+                boolean moved = draft().moveSelectedItems(target);
                 this.lastDragTarget = target;
+                if (!moved) {
+                    trace(
+                            "drag-dispatch type={} kind={} selectedItems={} target={} blockedReason=search-preference-capacity persistablePrefix={} draftItems={}",
+                            currentType(),
+                            active.kind,
+                            draft().selectedItemIndices().size(),
+                            target,
+                            draft().currentSearchPreferenceCapacity(),
+                            currentItemCount()
+                    );
+                    return true;
+                }
                 preview();
                 int targetFocus = Math.clamp(target, 0, Math.max(0, currentItemCount() - 1));
                 int focusIndex = draft().selectedItemIndices().stream()
@@ -542,6 +585,7 @@ public final class CreativeTabEditorController {
             this.mode = Mode.EDIT;
             this.lastDragTarget = -1;
             this.dragVisual = null;
+            refreshSearchAfterTabMutation("tab-drag-release");
             syncDraftCurrentTabToScreen("tab-drag-release");
             updateVirtualTail("tab-drag-release");
             clearPageHover("tab-drag-release");
@@ -885,6 +929,21 @@ public final class CreativeTabEditorController {
             }
             case NORMAL_ITEM -> {
                 beginEdit(Mode.EDIT, this.host.visualCreativeTabEditor$selectedTab());
+                ensureSearchOrderPrepared(
+                        this.host.visualCreativeTabEditor$selectedTab(),
+                        "normal-item-long-press"
+                );
+                active.itemIndex = itemIndexForSlot(active.slot);
+                trace(
+                        "item-press-map type={} slotIndex={} mappedIndex={} menuItems={} visibleItems={} draftItems={} accepted={} reason=normal-long-press",
+                        currentType(),
+                        active.slot == null ? -1 : active.slot.index,
+                        active.itemIndex,
+                        this.host.visualCreativeTabEditor$menu().items.size(),
+                        this.host.visualCreativeTabEditor$selectedTab().getDisplayItems().size(),
+                        currentItemCount(),
+                        active.itemIndex >= 0
+                );
                 this.contextItemIndex = active.itemIndex;
                 this.contextX = (int) active.x + 12;
                 this.contextY = (int) active.y - 8;
@@ -904,7 +963,7 @@ public final class CreativeTabEditorController {
                 this.contextX = (int) active.x + 12;
                 this.contextY = (int) active.y - 8;
                 setContextItemTarget(active.slot);
-                this.mode = Mode.CONTEXT_ITEM;
+                this.mode = currentType() == CreativeTabType.CATEGORY ? Mode.CONTEXT_ITEM : Mode.EDIT;
             }
         }
         if (this.mode == Mode.CONTEXT_TAB || this.mode == Mode.CONTEXT_ITEM) {
@@ -932,6 +991,7 @@ public final class CreativeTabEditorController {
                 this.draft.setCurrentTab(id);
             }
         });
+        ensureSearchOrderPrepared(selected, "begin-edit");
         this.mode = editMode;
         updateVirtualTail("begin-edit");
         trace(
@@ -1338,10 +1398,7 @@ public final class CreativeTabEditorController {
                 CreativeTabSortMode selected = modes.get(index);
                 Comparator<ItemStack> comparator = itemComparator(selected);
                 if (currentType() == CreativeTabType.SEARCH) {
-                    draft().sortCurrentSearchItems(
-                            this.host.visualCreativeTabEditor$selectedTab().getDisplayItems(),
-                            comparator
-                    );
+                    draft().sortCurrentSearchItems(draft().currentItems(), comparator);
                 } else if (currentType() == CreativeTabType.CATEGORY) {
                     draft().sortCurrentItems(comparator);
                 }
@@ -1366,6 +1423,8 @@ public final class CreativeTabEditorController {
     }
 
     private void deleteTabs() {
+        int preferredRow = this.host.visualCreativeTabEditor$menu()
+                .getRowIndexForScroll(this.host.visualCreativeTabEditor$scrollOffset());
         Set<Identifier> selected = new LinkedHashSet<>(draft().selectedTabIds());
         if (selected.isEmpty()) {
             return;
@@ -1395,7 +1454,11 @@ public final class CreativeTabEditorController {
         if (fallbackId != null) {
             draft().setCurrentTab(fallbackId);
         }
+        boolean refreshSearch = fallbackId == null && currentType() == CreativeTabType.SEARCH;
         preview();
+        if (refreshSearch) {
+            CreativeTabRuntime.rebuildSearchContents();
+        }
         if (fallbackId != null) {
             CreativeTabRuntime.effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream())
                     .filter(tab -> CreativeTabRuntime.id(tab).filter(fallbackId::equals).isPresent())
@@ -1409,6 +1472,39 @@ public final class CreativeTabEditorController {
             );
         }
         this.host.visualCreativeTabEditor$refreshScreen();
+        if (refreshSearch) {
+            ensureSearchOrderPrepared(
+                    this.host.visualCreativeTabEditor$selectedTab(),
+                    "delete-tabs-search-refresh"
+            );
+            refreshCurrentDraftItems(preferredRow, "delete-tabs-search-refresh");
+            trace(
+                    "delete-tabs-search-refresh hiddenTabs={} preparedItems={} persistablePrefix={} row={}",
+                    selected.size(),
+                    currentItemCount(),
+                    draft().currentSearchPreferenceCapacity(),
+                    preferredRow
+            );
+        }
+    }
+
+    private void refreshSearchAfterTabMutation(String reason) {
+        if (currentType() != CreativeTabType.SEARCH || draft().hasPreparedCurrentSearchItems()) {
+            return;
+        }
+        int preferredRow = this.host.visualCreativeTabEditor$menu()
+                .getRowIndexForScroll(this.host.visualCreativeTabEditor$scrollOffset());
+        CreativeTabRuntime.rebuildSearchContents();
+        this.host.visualCreativeTabEditor$refreshScreen();
+        ensureSearchOrderPrepared(this.host.visualCreativeTabEditor$selectedTab(), reason);
+        refreshCurrentDraftItems(preferredRow, reason);
+        trace(
+                "search-refresh-after-tab-mutation reason={} preparedItems={} persistablePrefix={} row={}",
+                reason,
+                currentItemCount(),
+                draft().currentSearchPreferenceCapacity(),
+                preferredRow
+        );
     }
 
     private void deleteItems() {
@@ -1453,6 +1549,7 @@ public final class CreativeTabEditorController {
             return;
         }
         this.draft.setCurrentTab(selectedId);
+        ensureSearchOrderPrepared(selected, reason + "-search");
         trace(
                 "draft-current-tab-sync reason={} before={} screenSelected={} selectedItemsCleared=true",
                 reason,
@@ -1640,24 +1737,27 @@ public final class CreativeTabEditorController {
             }
             int x = this.host.visualCreativeTabEditor$left() + this.host.visualCreativeTabEditor$tabX(tab) + 17;
             int y = this.host.visualCreativeTabEditor$top() + this.host.visualCreativeTabEditor$tabY(tab) + 3;
-            renderCheck(graphics, x, y, draft().selectedTabIds().contains(id));
+            renderCheck(graphics, x, y, draft().isTabSelected(id));
         }
     }
 
     private void renderItemChecks(GuiGraphicsExtractor graphics) {
-        if (currentType() != CreativeTabType.CATEGORY || !screenMatchesDraftCurrentTab()) {
+        if (!canReorderCurrentItems() || !screenMatchesDraftCurrentTab()) {
             return;
         }
         for (Slot slot : this.host.visualCreativeTabEditor$menu().slots) {
             if (!this.host.visualCreativeTabEditor$isCreativeSlot(slot) || !slot.hasItem()) {
                 continue;
             }
-            int absolute = absoluteItemIndex(slot);
+            int itemIndex = itemIndexForSlot(slot);
+            if (itemIndex < 0) {
+                continue;
+            }
             renderCheck(
                     graphics,
                     this.host.visualCreativeTabEditor$left() + slot.x + 9,
                     this.host.visualCreativeTabEditor$top() + slot.y - 1,
-                    draft().selectedItemIndices().contains(absolute)
+                    draft().isItemSelected(itemIndex)
             );
         }
     }
@@ -1680,10 +1780,7 @@ public final class CreativeTabEditorController {
         if (this.mode == Mode.CONTEXT_TAB && this.contextTabId != null) {
             stack = draft().definition(this.contextTabId).map(CreativeTabDefinition::icon).orElse(ItemStack.EMPTY);
         } else if (this.mode == Mode.CONTEXT_ITEM) {
-            List<ItemStack> items = draft().currentItems();
-            if (this.contextItemIndex >= 0 && this.contextItemIndex < items.size()) {
-                stack = items.get(this.contextItemIndex);
-            }
+            stack = draft().currentItemAt(this.contextItemIndex);
         }
         if (!stack.isEmpty()) {
             graphics.fill(this.contextTargetX - 2, this.contextTargetY - 2, this.contextTargetX + 18, this.contextTargetY + 18, 0xCC222222);
@@ -1825,13 +1922,67 @@ public final class CreativeTabEditorController {
         return row * 9 + slot.index;
     }
 
+    private int itemIndexForSlot(@Nullable Slot slot) {
+        if (slot == null || !slot.hasItem()) {
+            return -1;
+        }
+        if (currentType() != CreativeTabType.SEARCH) {
+            return absoluteItemIndex(slot);
+        }
+        if (this.draft == null) {
+            return -1;
+        }
+        return draft().indexOfPreparedSearchItem(slot.getItem(), CreativeTabValidation.MAX_ITEMS_PER_TAB);
+    }
+
     private int itemInsertionIndex(double x, double y) {
         Slot slot = creativeSlotAt(x, y);
-        return slot == null ? -1 : Math.min(absoluteItemIndex(slot), draft().currentItems().size());
+        if (slot == null) {
+            return -1;
+        }
+        int size = currentItemCount();
+        if (currentType() == CreativeTabType.SEARCH) {
+            int index = itemIndexForSlot(slot);
+            if (index >= 0) {
+                int absoluteX = this.host.visualCreativeTabEditor$left() + slot.x;
+                return Math.min(index + (x >= absoluteX + 8 ? 1 : 0), size);
+            }
+            if (slot.hasItem()) {
+                return -1;
+            }
+            List<ItemStack> menuItems = this.host.visualCreativeTabEditor$menu().items;
+            for (int menuIndex = menuItems.size() - 1; menuIndex >= 0; menuIndex--) {
+                int preparedIndex = indexOfMatchingPreparedSearchItem(menuItems.get(menuIndex));
+                if (preparedIndex >= 0) {
+                    return Math.min(preparedIndex + 1, size);
+                }
+            }
+            return -1;
+        }
+        int index = absoluteItemIndex(slot);
+        if (index < 0) {
+            return -1;
+        }
+        int absoluteX = this.host.visualCreativeTabEditor$left() + slot.x;
+        if (slot.hasItem() && x >= absoluteX + 8) {
+            index++;
+        }
+        return Math.min(index, size);
+    }
+
+    private int indexOfMatchingPreparedSearchItem(ItemStack target) {
+        if (this.draft == null) {
+            return -1;
+        }
+        return draft().indexOfPreparedSearchItem(target, CreativeTabValidation.MAX_ITEMS_PER_TAB);
     }
 
     private boolean handleItemDragTabHover(double x, double y) {
         if (this.mode != Mode.DRAG_ITEMS) {
+            clearItemDragTabHover();
+            return false;
+        }
+        if (currentType() != CreativeTabType.CATEGORY) {
             clearItemDragTabHover();
             return false;
         }
@@ -2190,44 +2341,29 @@ public final class CreativeTabEditorController {
     }
 
     private CreativeTabType currentType() {
-        return draft().currentTab().map(CreativeTabDefinition::type).orElse(CreativeTabType.CATEGORY);
+        return draft().currentTabType();
     }
 
     private int currentItemCount() {
-        return this.draft == null
-                ? -1
-                : this.draft.currentTab().map(definition -> definition.items().size()).orElse(-1);
+        return this.draft == null ? -1 : this.draft.currentItemCount();
     }
 
     private int currentSearchItemCount() {
-        return this.draft == null
-                ? -1
-                : this.draft.currentTab().map(definition -> definition.searchItems().size()).orElse(-1);
+        return this.draft == null ? -1 : this.draft.currentSearchItemCount();
     }
 
     private ItemStack currentItemAt(int index) {
         if (this.draft == null) {
             return ItemStack.EMPTY;
         }
-        return this.draft.currentTab()
-                .filter(definition -> index >= 0 && index < definition.items().size())
-                .map(definition -> definition.items().get(index))
-                .orElse(ItemStack.EMPTY);
+        return this.draft.currentItemAt(index);
     }
 
     private int indexOfMatchingCurrentItem(ItemStack target, int excludedIndex) {
         if (this.draft == null || target.isEmpty()) {
             return -1;
         }
-        List<ItemStack> items = this.draft.currentTab()
-                .map(CreativeTabDefinition::items)
-                .orElse(List.of());
-        for (int index = 0; index < items.size(); index++) {
-            if (index != excludedIndex && ItemStack.isSameItemSameComponents(items.get(index), target)) {
-                return index;
-            }
-        }
-        return -1;
+        return this.draft.indexOfMatchingCurrentItem(target, excludedIndex);
     }
 
     private void updateVirtualTail(String reason) {
@@ -2275,43 +2411,61 @@ public final class CreativeTabEditorController {
     }
 
     private void refreshCurrentDraftItems(int preferredRow, int focusIndex, String reason) {
-        if (this.draft == null || currentType() != CreativeTabType.CATEGORY) {
+        if (this.draft == null || !canReorderCurrentItems()) {
             return;
         }
         List<ItemStack> expected = draft().currentItems();
         var menu = this.host.visualCreativeTabEditor$menu();
+        List<ItemStack> previousMenuItems = new ArrayList<>(menu.items);
+        Collection<ItemStack> runtime = this.host.visualCreativeTabEditor$selectedTab().getDisplayItems();
+        List<ItemStack> displayed = expected;
+        if (currentType() == CreativeTabType.SEARCH) {
+            Set<ItemStack> previousView = ItemStackLinkedSet.createTypeAndComponentsSet();
+            previousView.addAll(previousMenuItems);
+            displayed = new ArrayList<>(previousMenuItems.size());
+            for (ItemStack stack : expected) {
+                if (previousView.contains(stack)) {
+                    displayed.add(stack.copyWithCount(1));
+                }
+            }
+        }
         menu.items.clear();
-        for (ItemStack stack : expected) {
+        for (ItemStack stack : displayed) {
             menu.items.add(stack.copyWithCount(1));
         }
         updateVirtualTail(reason + "-refresh");
-        int logicalSize = expected.size() + (this.virtualTailEnabled ? 1 : 0);
+        int logicalSize = displayed.size() + (this.virtualTailEnabled ? 1 : 0);
         int maxRow = Math.max(0, Mth.positiveCeilDiv(logicalSize, 9) - 5);
         int row = Mth.clamp(preferredRow, 0, maxRow);
-        if (focusIndex >= 0 && focusIndex < expected.size()) {
-            if (focusIndex < row * 9) {
-                row = focusIndex / 9;
-            } else if (focusIndex >= (row + 5) * 9) {
-                row = focusIndex / 9 - 4;
+        int displayedFocusIndex = focusIndex;
+        if (currentType() == CreativeTabType.SEARCH && focusIndex >= 0 && focusIndex < expected.size()) {
+            displayedFocusIndex = indexOfMatching(displayed, expected.get(focusIndex));
+        }
+        if (displayedFocusIndex >= 0 && displayedFocusIndex < displayed.size()) {
+            if (displayedFocusIndex < row * 9) {
+                row = displayedFocusIndex / 9;
+            } else if (displayedFocusIndex >= (row + 5) * 9) {
+                row = displayedFocusIndex / 9 - 4;
             }
             row = Mth.clamp(row, 0, maxRow);
         }
         float scroll = maxRow == 0 ? 0.0F : menu.getScrollForRowIndex(row);
         this.host.visualCreativeTabEditor$setScrollOffset(scroll);
         menu.scrollTo(scroll);
-        Collection<ItemStack> runtime = this.host.visualCreativeTabEditor$selectedTab().getDisplayItems();
         int mismatch = firstMismatch(expected, runtime);
         trace(
-                "draft-menu-refresh reason={} tab={} expectedItems={} menuItems={} runtimeItems={} firstMismatch={} row={}/{} focusIndex={} scroll={} plusVisible={}",
+                "draft-menu-refresh reason={} tab={} expectedItems={} previousMenuItems={} menuItems={} runtimeItems={} firstMismatch={} row={}/{} focusIndex={} displayedFocusIndex={} scroll={} plusVisible={}",
                 reason,
                 draft().currentTabId().orElse(null),
                 expected.size(),
+                previousMenuItems.size(),
                 menu.items.size(),
                 runtime.size(),
                 mismatch,
                 row,
                 maxRow,
                 focusIndex,
+                displayedFocusIndex,
                 scroll,
                 itemPlusRect() != null
         );
@@ -2328,6 +2482,62 @@ public final class CreativeTabEditorController {
             index++;
         }
         return left.hasNext() || right.hasNext() ? index : -1;
+    }
+
+    private static int indexOfMatching(List<ItemStack> items, ItemStack target) {
+        for (int index = 0; index < items.size(); index++) {
+            if (ItemStack.isSameItemSameComponents(items.get(index), target)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private boolean canReorderCurrentItems() {
+        CreativeTabType type = currentType();
+        return type == CreativeTabType.CATEGORY || type == CreativeTabType.SEARCH;
+    }
+
+    private void ensureSearchOrderPrepared(@Nullable CreativeModeTab selected, String reason) {
+        if (this.draft == null || selected == null) {
+            return;
+        }
+        Identifier selectedId = CreativeTabRuntime.id(selected).orElse(null);
+        CreativeTabDefinition definition = selectedId == null
+                ? null
+                : this.draft.definition(selectedId).orElse(null);
+        if (definition == null || definition.type() != CreativeTabType.SEARCH) {
+            return;
+        }
+        Identifier currentBefore = this.draft.currentTabId().orElse(null);
+        if (!selectedId.equals(currentBefore)) {
+            this.draft.setCurrentTab(selectedId);
+        }
+        if (this.draft.hasPreparedCurrentSearchItems()) {
+            trace(
+                    "search-order-prepare-skip reason={} tab={} preparedItems={} persistedPreference={} currentBefore={}",
+                    reason,
+                    selectedId,
+                    this.draft.currentItemCount(),
+                    definition.items().size(),
+                    currentBefore
+            );
+            return;
+        }
+        Collection<ItemStack> visible = selected.getDisplayItems();
+        List<ItemStack> preferredBefore = definition.items();
+        this.draft.prepareCurrentSearchItems(visible);
+        List<ItemStack> prepared = this.draft.currentItems();
+        trace(
+                "search-order-prepare reason={} tab={} visible={} prepared={} persistedPreference={} firstMismatch={} persistedChanged=false currentBefore={}",
+                reason,
+                selectedId,
+                visible.size(),
+                prepared.size(),
+                preferredBefore.size(),
+                firstMismatch(prepared, visible),
+                currentBefore
+        );
     }
 
     private void logDraftSanitization(CreativeTabCatalog source) {
@@ -2502,7 +2712,7 @@ public final class CreativeTabEditorController {
     }
 
     private @Nullable Rect itemPlusRect() {
-        int size = draft().currentItems().size();
+        int size = currentItemCount();
         int row = this.host.visualCreativeTabEditor$menu()
                 .getRowIndexForScroll(this.host.visualCreativeTabEditor$scrollOffset());
         int relative = size - row * 9;
@@ -2654,10 +2864,13 @@ public final class CreativeTabEditorController {
         double ghostX = this.dragVisual == null ? event.x() - 8.0D : event.x() - this.dragVisual.grabOffsetX;
         double ghostY = this.dragVisual == null ? event.y() - 8.0D : event.y() - this.dragVisual.grabOffsetY;
         trace(
-                "drag-start mode={} sourceKind={} longTriggered={} tab={} item={} pointer=({}, {}) ghostTopLeft=({}, {}) grabOffset=({}, {}) contextTarget=({}, {})",
+                "drag-start mode={} sourceKind={} longTriggered={} currentTab={} currentType={} selectedItems={} tab={} item={} pointer=({}, {}) ghostTopLeft=({}, {}) grabOffset=({}, {}) contextTarget=({}, {})",
                 dragMode,
                 active.kind,
                 active.longTriggered,
+                draft().currentTabId().orElse(null),
+                currentType(),
+                draft().selectedItemIndices().size(),
                 tabId(active.tab),
                 itemId(active.slot),
                 event.x(),
@@ -2681,10 +2894,8 @@ public final class CreativeTabEditorController {
                     : draft().definition(id).map(CreativeTabDefinition::icon).orElseGet(active.tab::getIconItem);
             origin = tabIconRect(active.tab);
         } else if (active.slot != null) {
-            List<ItemStack> items = draft().currentItems();
-            icon = active.itemIndex >= 0 && active.itemIndex < items.size()
-                    ? items.get(active.itemIndex)
-                    : active.slot.getItem();
+            ItemStack current = draft().currentItemAt(active.itemIndex);
+            icon = current.isEmpty() ? active.slot.getItem() : current;
             origin = new Rect(
                     this.host.visualCreativeTabEditor$left() + active.slot.x,
                     this.host.visualCreativeTabEditor$top() + active.slot.y,
@@ -2805,7 +3016,7 @@ public final class CreativeTabEditorController {
         private final int slotId;
         private final int button;
         private final @Nullable ContainerInput input;
-        private final int itemIndex;
+        private int itemIndex;
         private final boolean doubleClick;
         private boolean longTriggered;
         private boolean moved;

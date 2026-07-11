@@ -6,8 +6,10 @@ import com.kltyton.visual_creative_tab_editor.data.CreativeTabLayout;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabPatch;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabValidation;
+import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackLinkedSet;
 
@@ -15,8 +17,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -34,7 +38,12 @@ public final class CreativeTabDraft {
     private final List<CreativeTabDefinition> tabs = new ArrayList<>();
     private final LinkedHashSet<Identifier> selectedTabIds = new LinkedHashSet<>();
     private final NavigableSet<Integer> selectedItemIndices = new TreeSet<>();
+    private final List<ItemStack> currentSearchItems = new ArrayList<>();
+    private final Map<Item, Map<DataComponentMap, Integer>> currentSearchItemIndices = new HashMap<>();
     private Identifier currentTabId;
+    private CreativeTabType currentTabType = CreativeTabType.CATEGORY;
+    private int currentSearchPreferenceCapacity;
+    private boolean currentSearchItemsPrepared;
 
     /** Creates a deep editing copy of {@code catalog}. */
     public CreativeTabDraft(CreativeTabCatalog catalog) {
@@ -48,6 +57,9 @@ public final class CreativeTabDraft {
                 .map(CreativeTabDefinition::id)
                 .findFirst()
                 .orElseGet(() -> this.tabs.isEmpty() ? null : this.tabs.getFirst().id());
+        if (this.currentTabId != null) {
+            this.currentTabType = this.tabs.get(requireTabIndex(this.currentTabId)).type();
+        }
     }
 
     public static CreativeTabDraft fromCatalog(CreativeTabCatalog catalog) {
@@ -76,17 +88,22 @@ public final class CreativeTabDraft {
         return this.currentTabId == null ? Optional.empty() : definition(this.currentTabId);
     }
 
+    /** Returns the current type without copying the definition or its stacks. */
+    public CreativeTabType currentTabType() {
+        return this.currentTabType;
+    }
+
     /** Changes the item-editing target and clears index-based item selection. */
     public void setCurrentTab(Identifier id) {
-        Identifier checked = requireExistingId(id);
-        if (!checked.equals(this.currentTabId)) {
-            this.currentTabId = checked;
-            this.selectedItemIndices.clear();
-        }
+        switchCurrentTab(requireExistingId(id));
     }
 
     public Set<Identifier> selectedTabIds() {
         return Collections.unmodifiableSet(new LinkedHashSet<>(this.selectedTabIds));
+    }
+
+    public boolean isTabSelected(Identifier id) {
+        return this.selectedTabIds.contains(requireId(id));
     }
 
     public void setTabSelected(Identifier id, boolean selected) {
@@ -145,8 +162,22 @@ public final class CreativeTabDraft {
         }
         int insertionIndex = targetIndex - removedBeforeTarget;
         remaining.addAll(insertionIndex, moving);
+        boolean changed = false;
+        for (int index = 0; index < this.tabs.size(); index++) {
+            if (!this.tabs.get(index).id().equals(remaining.get(index).id())) {
+                changed = true;
+                break;
+            }
+        }
+        if (!changed) {
+            return;
+        }
         this.tabs.clear();
         this.tabs.addAll(remaining);
+        if (this.currentTabType == CreativeTabType.SEARCH) {
+            this.selectedItemIndices.clear();
+            invalidatePreparedSearchItems();
+        }
     }
 
     public void setSelectedTabsHidden(boolean hidden) {
@@ -155,26 +186,79 @@ public final class CreativeTabDraft {
 
     public void setTabsHidden(Collection<Identifier> ids, boolean hidden) {
         Set<Identifier> checked = checkedIds(ids);
+        boolean changed = false;
         for (int index = 0; index < this.tabs.size(); index++) {
             CreativeTabDefinition definition = this.tabs.get(index);
             if (checked.contains(definition.id()) && definition.hidden() != hidden) {
                 this.tabs.set(index, withHidden(definition, hidden));
+                changed = true;
             }
+        }
+        if (changed && this.currentTabType == CreativeTabType.SEARCH) {
+            this.selectedItemIndices.clear();
+            invalidatePreparedSearchItems();
         }
     }
 
-    /** Returns defensive count-one copies of the current category's items. */
+    /** Returns defensive count-one copies of the current reorderable tab's items. */
     public List<ItemStack> currentItems() {
-        return copyStacks(requireEditableCategory().items());
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        if (definition.type() == CreativeTabType.SEARCH && this.currentSearchItemsPrepared) {
+            return copyStacks(this.currentSearchItems);
+        }
+        return copyStacks(definition.items());
+    }
+
+    /** Returns the current visible working-list size without copying its stacks. */
+    public int currentItemCount() {
+        CreativeTabDefinition definition = requireCurrentTab();
+        if (definition.type() == CreativeTabType.SEARCH && this.currentSearchItemsPrepared) {
+            return this.currentSearchItems.size();
+        }
+        return definition.items().size();
+    }
+
+    public int currentSearchItemCount() {
+        return requireCurrentTab().searchItems().size();
+    }
+
+    /** Returns one defensive stack copy without copying the complete current list. */
+    public ItemStack currentItemAt(int index) {
+        CreativeTabDefinition definition = requireCurrentTab();
+        List<ItemStack> items = definition.type() == CreativeTabType.SEARCH && this.currentSearchItemsPrepared
+                ? this.currentSearchItems
+                : definition.items();
+        return index >= 0 && index < items.size() ? normalizeStack(items.get(index)) : ItemStack.EMPTY;
+    }
+
+    /** Finds an equal current stack without materializing a defensive list copy. */
+    public int indexOfMatchingCurrentItem(ItemStack target, int excludedIndex) {
+        if (target == null || target.isEmpty()) {
+            return -1;
+        }
+        CreativeTabDefinition definition = requireCurrentTab();
+        List<ItemStack> items = definition.type() == CreativeTabType.SEARCH && this.currentSearchItemsPrepared
+                ? this.currentSearchItems
+                : definition.items();
+        for (int index = 0; index < items.size(); index++) {
+            if (index != excludedIndex && ItemStack.isSameItemSameComponents(items.get(index), target)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     public Set<Integer> selectedItemIndices() {
         return Collections.unmodifiableSet(new TreeSet<>(this.selectedItemIndices));
     }
 
+    public boolean isItemSelected(int index) {
+        return this.selectedItemIndices.contains(index);
+    }
+
     public void setItemSelected(int index, boolean selected) {
-        CreativeTabDefinition definition = requireEditableCategory();
-        checkElementIndex(index, definition.items().size(), "item index");
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        checkElementIndex(index, reorderableItems(definition).size(), "item index");
         if (selected) {
             this.selectedItemIndices.add(index);
         } else {
@@ -184,8 +268,8 @@ public final class CreativeTabDraft {
 
     /** Toggles an index-based item selection and returns its new state. */
     public boolean toggleItemSelection(int index) {
-        CreativeTabDefinition definition = requireEditableCategory();
-        checkElementIndex(index, definition.items().size(), "item index");
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        checkElementIndex(index, reorderableItems(definition).size(), "item index");
         if (this.selectedItemIndices.remove(index)) {
             return false;
         }
@@ -201,8 +285,8 @@ public final class CreativeTabDraft {
      * Moves selected items as one stable block. {@code targetIndex} is a slot in
      * the pre-move item list: {@code 0} is the start and {@code size()} is the end.
      */
-    public void moveSelectedItems(int targetIndex) {
-        moveItems(this.selectedItemIndices, targetIndex);
+    public boolean moveSelectedItems(int targetIndex) {
+        return moveItems(this.selectedItemIndices, targetIndex);
     }
 
     /**
@@ -274,20 +358,27 @@ public final class CreativeTabDraft {
         int targetTabIndex = requireTabIndex(target.id());
         this.tabs.set(sourceTabIndex, updatedSource);
         this.tabs.set(targetTabIndex, updatedTarget);
-        this.currentTabId = checkedTargetId;
+        switchCurrentTab(checkedTargetId);
         selectContiguousItems(insertionIndex, moving.size());
         return moving.size();
     }
 
     /** Moves the supplied stable indices as one block in their original order. */
-    public void moveItems(Collection<Integer> indices, int targetIndex) {
+    public boolean moveItems(Collection<Integer> indices, int targetIndex) {
         Objects.requireNonNull(indices, "indices");
-        CreativeTabDefinition definition = requireEditableCategory();
-        List<ItemStack> items = new ArrayList<>(definition.items());
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        List<ItemStack> items = new ArrayList<>(reorderableItems(definition));
         checkInsertionIndex(targetIndex, items.size(), "item target index");
         NavigableSet<Integer> movingIndices = checkedItemIndices(indices, items.size());
         if (movingIndices.isEmpty()) {
-            return;
+            return true;
+        }
+        if (definition.type() == CreativeTabType.SEARCH) {
+            int preferenceCapacity = this.currentSearchPreferenceCapacity;
+            if (targetIndex > preferenceCapacity
+                    || movingIndices.stream().anyMatch(index -> index >= preferenceCapacity)) {
+                return false;
+            }
         }
 
         List<ItemStack> moving = new ArrayList<>(movingIndices.size());
@@ -305,8 +396,18 @@ public final class CreativeTabDraft {
         }
         int insertionIndex = targetIndex - removedBeforeTarget;
         remaining.addAll(insertionIndex, moving);
-        replaceCurrentItems(definition, remaining);
+        if (sameStackOrder(items, remaining)) {
+            selectContiguousItems(insertionIndex, moving.size());
+            return true;
+        }
+        if (definition.type() == CreativeTabType.SEARCH) {
+            replacePreparedSearchItems(remaining);
+            replaceCurrentItems(definition, searchPreference(definition, this.currentSearchItems));
+        } else {
+            replaceCurrentItems(definition, remaining);
+        }
         selectContiguousItems(insertionIndex, moving.size());
+        return true;
     }
 
     /** Deletes selected items and returns the number removed. */
@@ -465,8 +566,42 @@ public final class CreativeTabDraft {
             items.add(normalizeStack(stack));
         }
         items.sort(Objects.requireNonNull(comparator, "comparator"));
-        replaceCurrentItems(definition, items);
+        replacePreparedSearchItems(items);
+        replaceCurrentItems(definition, searchPreference(definition, this.currentSearchItems));
         this.selectedItemIndices.clear();
+    }
+
+    /**
+     * Prepares the dynamic search display for index-based selection without
+     * changing the persisted search preference.
+     */
+    public void prepareCurrentSearchItems(Collection<ItemStack> currentSearchItems) {
+        Objects.requireNonNull(currentSearchItems, "currentSearchItems");
+        CreativeTabDefinition definition = requireCurrentTab();
+        if (definition.type() != CreativeTabType.SEARCH) {
+            throw new IllegalStateException("The current tab is not the search tab");
+        }
+        replacePreparedSearchItems(currentSearchItems);
+        this.selectedItemIndices.clear();
+    }
+
+    public boolean hasPreparedCurrentSearchItems() {
+        return this.currentTabType == CreativeTabType.SEARCH && this.currentSearchItemsPrepared;
+    }
+
+    public int currentSearchPreferenceCapacity() {
+        return this.currentSearchItemsPrepared ? this.currentSearchPreferenceCapacity : 0;
+    }
+
+    /** Returns the prepared search index without copying or scanning the search list. */
+    public int indexOfPreparedSearchItem(ItemStack stack, int maxExclusive) {
+        if (!this.currentSearchItemsPrepared || stack == null || stack.isEmpty() || maxExclusive <= 0) {
+            return -1;
+        }
+        Map<DataComponentMap, Integer> byComponents = this.currentSearchItemIndices.get(stack.getItem());
+        Integer index = byComponents == null ? null : byComponents.get(stack.getComponents());
+        int limit = Math.min(maxExclusive, this.currentSearchPreferenceCapacity);
+        return index != null && index < limit ? index : -1;
     }
 
     public void setCurrentTabIcon(ItemStack icon) {
@@ -519,8 +654,7 @@ public final class CreativeTabDraft {
                 CreativeTabLayout.DEFAULT
         );
         this.tabs.add(definition);
-        this.currentTabId = id;
-        this.selectedItemIndices.clear();
+        switchCurrentTab(id);
         return id;
     }
 
@@ -545,6 +679,133 @@ public final class CreativeTabDraft {
             throw new IllegalStateException("Only category-tab items can be edited");
         }
         return definition;
+    }
+
+    private CreativeTabDefinition requireReorderableItemsTab() {
+        CreativeTabDefinition definition = requireCurrentTab();
+        if (definition.type() != CreativeTabType.CATEGORY && definition.type() != CreativeTabType.SEARCH) {
+            throw new IllegalStateException(
+                    "Items of " + definition.type().serializedName() + " tabs cannot be reordered"
+            );
+        }
+        return definition;
+    }
+
+    private List<ItemStack> reorderableItems(CreativeTabDefinition definition) {
+        if (definition.type() != CreativeTabType.SEARCH) {
+            return definition.items();
+        }
+        if (!this.currentSearchItemsPrepared) {
+            throw new IllegalStateException("The dynamic search order has not been prepared");
+        }
+        return this.currentSearchItems;
+    }
+
+    private int searchVisiblePreferenceCapacity(
+            CreativeTabDefinition definition,
+            List<ItemStack> visibleItems
+    ) {
+        int invisibleCount = invisibleSearchPreferences(definition, visibleItems).size();
+        int capacity = maxSearchPreferenceSize(definition) - invisibleCount;
+        return Math.min(visibleItems.size(), Math.max(0, capacity));
+    }
+
+    private List<ItemStack> searchPreference(
+            CreativeTabDefinition definition,
+            List<ItemStack> orderedVisibleItems
+    ) {
+        List<IndexedSearchPreference> invisible = invisibleSearchPreferences(definition, orderedVisibleItems);
+        int maxPreferenceSize = maxSearchPreferenceSize(definition);
+        int visibleLimit = Math.max(0, maxPreferenceSize - invisible.size());
+        List<ItemStack> preference = new ArrayList<>(Math.min(
+                maxPreferenceSize,
+                orderedVisibleItems.size() + invisible.size()
+        ));
+        for (int index = 0; index < orderedVisibleItems.size() && index < visibleLimit; index++) {
+            preference.add(normalizeStack(orderedVisibleItems.get(index)));
+        }
+        for (IndexedSearchPreference retained : invisible) {
+            int insertionIndex = Math.min(retained.originalIndex(), preference.size());
+            preference.add(insertionIndex, normalizeStack(retained.stack()));
+        }
+        return preference;
+    }
+
+    private static List<IndexedSearchPreference> invisibleSearchPreferences(
+            CreativeTabDefinition definition,
+            List<ItemStack> visibleItems
+    ) {
+        Set<ItemStack> visible = ItemStackLinkedSet.createTypeAndComponentsSet();
+        visible.addAll(visibleItems);
+        List<IndexedSearchPreference> invisible = new ArrayList<>();
+        for (int index = 0; index < definition.items().size(); index++) {
+            ItemStack preferred = definition.items().get(index);
+            if (!visible.contains(preferred)) {
+                invisible.add(new IndexedSearchPreference(index, normalizeStack(preferred)));
+            }
+        }
+        return invisible;
+    }
+
+    private int maxSearchPreferenceSize(CreativeTabDefinition currentSearch) {
+        long otherItems = 0L;
+        for (CreativeTabDefinition definition : this.tabs) {
+            otherItems += definition.searchItems().size();
+            if (!definition.id().equals(currentSearch.id())) {
+                otherItems += definition.items().size();
+            }
+        }
+        long globalCapacity = CreativeTabValidation.MAX_TOTAL_ITEMS - otherItems;
+        return (int) Math.clamp(globalCapacity, 0L, CreativeTabValidation.MAX_ITEMS_PER_TAB);
+    }
+
+    private void replacePreparedSearchItems(Collection<ItemStack> stacks) {
+        this.currentSearchItems.clear();
+        this.currentSearchItemIndices.clear();
+        for (ItemStack stack : stacks) {
+            ItemStack normalized = normalizeStack(stack);
+            Map<DataComponentMap, Integer> byComponents = this.currentSearchItemIndices.computeIfAbsent(
+                    normalized.getItem(),
+                    ignored -> new HashMap<>()
+            );
+            if (byComponents.putIfAbsent(normalized.getComponents(), this.currentSearchItems.size()) == null) {
+                this.currentSearchItems.add(normalized);
+            }
+        }
+        this.currentSearchPreferenceCapacity = searchVisiblePreferenceCapacity(
+                requireCurrentTab(),
+                this.currentSearchItems
+        );
+        this.currentSearchItemsPrepared = true;
+    }
+
+    private void invalidatePreparedSearchItems() {
+        this.currentSearchItems.clear();
+        this.currentSearchItemIndices.clear();
+        this.currentSearchPreferenceCapacity = 0;
+        this.currentSearchItemsPrepared = false;
+    }
+
+    private void switchCurrentTab(Identifier id) {
+        if (id.equals(this.currentTabId)) {
+            return;
+        }
+        this.currentTabId = id;
+        this.currentTabType = this.tabs.get(requireTabIndex(id)).type();
+        this.selectedItemIndices.clear();
+        invalidatePreparedSearchItems();
+    }
+
+    private static boolean sameStackOrder(List<ItemStack> left, List<ItemStack> right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int index = 0; index < left.size(); index++) {
+            if (!ItemStack.isSameItemSameComponents(left.get(index), right.get(index))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void replaceCurrentItems(CreativeTabDefinition expected, List<ItemStack> items) {
@@ -755,6 +1016,9 @@ public final class CreativeTabDraft {
             }
         }
         return copies;
+    }
+
+    private record IndexedSearchPreference(int originalIndex, ItemStack stack) {
     }
 
     private static CreativeTabDefinition copyDefinition(CreativeTabDefinition definition, int order) {

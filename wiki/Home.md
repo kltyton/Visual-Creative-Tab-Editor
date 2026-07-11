@@ -18,6 +18,16 @@
 | 安装位置 | 单人游戏安装在客户端；多人游戏需要客户端和服务端同时安装 |
 | 配置文件 | 当前没有独立配置文件 |
 
+## 版本分支
+
+| Minecraft | 分支 | 加载器 | Java |
+| --- | --- | --- | --- |
+| `26.2` | [`26.2`](https://github.com/kltyton/Visual-Creative-Tab-Editor/tree/26.2) | Fabric、NeoForge | `25+` |
+| `1.21.1` | [`1.21.1`](https://github.com/kltyton/Visual-Creative-Tab-Editor/tree/1.21.1) | Fabric、NeoForge、Forge | `21+` |
+| `1.20.1` | [`1.20.1`](https://github.com/kltyton/Visual-Creative-Tab-Editor/tree/1.20.1) | Fabric、Forge | `17+` |
+
+三个版本使用独立分支维护；版本移植不会提交到 `master`。
+
 ## 已实现功能
 
 - 原版和已注册 Mod 创造标签页的数据驱动投影。
