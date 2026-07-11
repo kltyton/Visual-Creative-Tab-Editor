@@ -44,7 +44,7 @@ ordering adapters.
 Members that only need wider Java access use loader-native transformation:
 
 - Fabric Loader 0.19 / Loom 1.16 reads
-  `one_enough_creative_tab.classtweaker`;
+  `visual_creative_tab_editor.classtweaker`;
 - NeoForge reads the common `META-INF/accesstransformer.cfg` plus the
   NeoForge-only `META-INF/neoforge-accesstransformer.cfg` for its patched page
   list.
@@ -52,3 +52,14 @@ Members that only need wider Java access use loader-native transformation:
 Mixin accessors and invokers are not used. Mixins remain only where behavior
 must change, such as data-driven method results, input interception, creative
 cache rebuild hooks, and the virtual item-tail row calculation.
+
+## Rename compatibility
+
+World packs using the previous directory names are moved to the
+`visual_creative_tab_editor_*` names on first start. If a directory move cannot
+be completed, the pinned pack source can still read the legacy location. Custom
+tab identifiers in the previous `one_enough_creative_tab` namespace remain
+editable so an existing world does not lose its visual-editor layout.
+If both directory names already exist, the current directory wins, the legacy
+directory is preserved, and a warning is logged instead of silently merging
+potentially conflicting player edits.

@@ -1,6 +1,6 @@
-# One Enough Creative Tab
+# Visual Creative Tab Editor / 可视化创造标签页编辑器
 
-One Enough Creative Tab 是一个面向 Minecraft 26.2 的创造标签页编辑 Mod，同时支持 Fabric 与 NeoForge。
+**可视化创造标签页编辑器**（Visual Creative Tab Editor）是一个面向 Minecraft 26.2 的创造标签页编辑 Mod，同时支持 Fabric 与 NeoForge。
 
 它把原版及已注册 Mod 的创造标签页投影为可重载的数据目录，并提供类似手机桌面的可视化编辑器。标签页的标题、图标、顺序、可见性和物品列表都可以由世界数据包控制。
 
@@ -33,14 +33,14 @@ One Enough Creative Tab 是一个面向 Minecraft 26.2 的创造标签页编辑 
 
 ## 快速导航
 
-- [安装与快速开始](https://github.com/kltyton/OneEnoughCreativeTab/wiki/安装与快速开始)
-- [可视化编辑器](https://github.com/kltyton/OneEnoughCreativeTab/wiki/可视化编辑器)
-- [整理与排序](https://github.com/kltyton/OneEnoughCreativeTab/wiki/整理与排序)
-- [数据包格式](https://github.com/kltyton/OneEnoughCreativeTab/wiki/数据包格式)
-- [数据存储与优先级](https://github.com/kltyton/OneEnoughCreativeTab/wiki/数据存储与优先级)
-- [故障排查](https://github.com/kltyton/OneEnoughCreativeTab/wiki/故障排查)
-- [架构设计](https://github.com/kltyton/OneEnoughCreativeTab/wiki/架构设计)
-- [开发与构建](https://github.com/kltyton/OneEnoughCreativeTab/wiki/开发与构建)
+- [安装与快速开始](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki/安装与快速开始)
+- [可视化编辑器](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki/可视化编辑器)
+- [整理与排序](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki/整理与排序)
+- [数据包格式](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki/数据包格式)
+- [数据存储与优先级](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki/数据存储与优先级)
+- [故障排查](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki/故障排查)
+- [架构设计](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki/架构设计)
+- [开发与构建](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki/开发与构建)
 
 ## 兼容性边界
 

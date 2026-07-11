@@ -11,15 +11,15 @@
     "environment": "*",
     "entrypoints": {
         "main": [
-            "com.kltyton.one_enough_creative_tab.OneEnoughCreativeTab"
+            "com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditor"
         ],
         "client": [
-            "com.kltyton.one_enough_creative_tab.OneEnoughCreativeTabClient"
+            "com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorClient"
         ]
     },
     "mixins": [
-        "one_enough_creative_tab.mixins.json",
-        "one_enough_creative_tab.fabric.mixins.json"
+        "visual_creative_tab_editor.mixins.json",
+        "visual_creative_tab_editor.fabric.mixins.json"
     ],
     "accessWidener": "${mod_id}.classtweaker",
     "depends": {

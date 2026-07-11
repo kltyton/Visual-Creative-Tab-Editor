@@ -9,10 +9,10 @@ authors = "${mod_author}" #optional
 description = '''${description}''' #mandatory (Supports multiline text)
 
 [[mixins]]
-config = "one_enough_creative_tab.mixins.json"
+config = "visual_creative_tab_editor.mixins.json"
 
 [[mixins]]
-config = "one_enough_creative_tab.neoforge.mixins.json"
+config = "visual_creative_tab_editor.neoforge.mixins.json"
 
 [[accessTransformers]]
 file = "META-INF/accesstransformer.cfg"

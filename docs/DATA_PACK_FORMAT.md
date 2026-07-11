@@ -1,6 +1,6 @@
 # Creative Tab data pack format
 
-One Enough Creative Tab reads server-data resources from:
+Visual Creative Tab Editor reads server-data resources from:
 
 ```text
 data/<namespace>/creative_tabs/<path>.json
@@ -18,9 +18,9 @@ retaining the lower layer's items.
 
 Each world contains two reserved directory packs:
 
-- `one_enough_creative_tab_generated_default` is regenerated from the final
+- `visual_creative_tab_editor_generated_default` is regenerated from the final
   native and modded tabs and pinned below every other pack.
-- `one_enough_creative_tab_player_overrides` stores visual-editor differences
+- `visual_creative_tab_editor_player_overrides` stores visual-editor differences
   and is pinned above every other pack.
 
 The player pack stores field-level differences from the non-player result. New

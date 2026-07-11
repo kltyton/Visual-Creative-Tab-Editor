@@ -1,6 +1,6 @@
-# One Enough Creative Tab
+# Visual Creative Tab Editor / 可视化创造标签页编辑器
 
-用于可视化、数据驱动编辑 Minecraft 创造标签页的 Fabric 与 NeoForge 多加载器 Mod。
+中文名：**可视化创造标签页编辑器**。这是一个用于可视化、数据驱动编辑 Minecraft 创造标签页的 Fabric 与 NeoForge 多加载器 Mod。
 
 A Fabric and NeoForge mod for visual, data-driven editing of Minecraft creative mode tabs.
 
@@ -40,7 +40,7 @@ Install the mod on both client and server for multiplayer. Fabric also requires 
 
 Full installation, editor, data-pack, and development documentation:
 
-[GitHub Wiki](https://github.com/kltyton/OneEnoughCreativeTab/wiki)
+[GitHub Wiki](https://github.com/kltyton/Visual-Creative-Tab-Editor/wiki)
 
 Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 
@@ -56,8 +56,8 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 构建产物：
 
 ```text
-fabric/build/libs/one_enough_creative_tab-fabric-26.2-26.2.0.0.jar
-neoforge/build/libs/one_enough_creative_tab-neoforge-26.2-26.2.0.0.jar
+fabric/build/libs/visual_creative_tab_editor-fabric-26.2-26.2.0.0.jar
+neoforge/build/libs/visual_creative_tab_editor-neoforge-26.2-26.2.0.0.jar
 ```
 
 Minecraft 26.2 使用 Java 25。Gradle toolchain resolver 可以在需要时提供配置的 JDK。
