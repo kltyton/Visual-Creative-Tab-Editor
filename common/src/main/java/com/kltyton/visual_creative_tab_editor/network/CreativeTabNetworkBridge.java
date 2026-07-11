@@ -3,7 +3,6 @@ package com.kltyton.visual_creative_tab_editor.network;
 import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
@@ -39,12 +38,12 @@ public final class CreativeTabNetworkBridge {
     /**
      * Sends a payload to one player, returning {@code false} when no loader bridge is installed or sending fails.
      */
-    public static boolean sendToPlayer(ServerPlayer player, CustomPacketPayload payload) {
+    public static boolean sendToPlayer(ServerPlayer player, CreativeTabPayload payload) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(payload, "payload");
         ServerSender sender = SERVER_SENDER.get();
         if (sender == null) {
-            VisualCreativeTabEditorConstants.LOGGER.error("Cannot send {} to player: server network bridge is not installed", payload.type().id());
+            VisualCreativeTabEditorConstants.LOGGER.error("Cannot send {} to player: server network bridge is not installed", payload.id());
             return false;
         }
 
@@ -52,7 +51,7 @@ public final class CreativeTabNetworkBridge {
             sender.send(player, payload);
             return true;
         } catch (RuntimeException exception) {
-            VisualCreativeTabEditorConstants.LOGGER.error("Failed to send {} to player {}", payload.type().id(), player.getScoreboardName(), exception);
+            VisualCreativeTabEditorConstants.LOGGER.error("Failed to send {} to player {}", payload.id(), player.getScoreboardName(), exception);
             return false;
         }
     }
@@ -60,11 +59,11 @@ public final class CreativeTabNetworkBridge {
     /**
      * Sends a payload to the logical server, returning {@code false} when no loader bridge is installed or sending fails.
      */
-    public static boolean sendToServer(CustomPacketPayload payload) {
+    public static boolean sendToServer(CreativeTabPayload payload) {
         Objects.requireNonNull(payload, "payload");
         ClientSender sender = CLIENT_SENDER.get();
         if (sender == null) {
-            VisualCreativeTabEditorConstants.LOGGER.error("Cannot send {} to server: client network bridge is not installed", payload.type().id());
+            VisualCreativeTabEditorConstants.LOGGER.error("Cannot send {} to server: client network bridge is not installed", payload.id());
             return false;
         }
 
@@ -72,18 +71,18 @@ public final class CreativeTabNetworkBridge {
             sender.send(payload);
             return true;
         } catch (RuntimeException exception) {
-            VisualCreativeTabEditorConstants.LOGGER.error("Failed to send {} to server", payload.type().id(), exception);
+            VisualCreativeTabEditorConstants.LOGGER.error("Failed to send {} to server", payload.id(), exception);
             return false;
         }
     }
 
     @FunctionalInterface
     public interface ServerSender {
-        void send(ServerPlayer player, CustomPacketPayload payload);
+        void send(ServerPlayer player, CreativeTabPayload payload);
     }
 
     @FunctionalInterface
     public interface ClientSender {
-        void send(CustomPacketPayload payload);
+        void send(CreativeTabPayload payload);
     }
 }

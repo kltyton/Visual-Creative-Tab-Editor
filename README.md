@@ -1,8 +1,8 @@
 # Visual Creative Tab Editor / 可视化创造标签页编辑器
 
-中文名：**可视化创造标签页编辑器**。这是一个用于可视化、数据驱动编辑 Minecraft 创造标签页的 Fabric 与 NeoForge 多加载器 Mod。
+中文名：**可视化创造标签页编辑器**。这是一个用于可视化、数据驱动编辑 Minecraft 创造标签页的 Fabric 与 Forge 多加载器 Mod。
 
-A Fabric and NeoForge mod for visual, data-driven editing of Minecraft creative mode tabs.
+A Fabric and Forge mod for visual, data-driven editing of Minecraft creative mode tabs.
 
 ## 当前状态 / Current status
 
@@ -18,21 +18,34 @@ A Fabric and NeoForge mod for visual, data-driven editing of Minecraft creative 
 
 The current version includes the data-driven catalog, world-local priority packs,
 the unified visual editor, semantic sorting, server validation, conflict handling,
-and native Fabric/NeoForge pagination integration.
+and loader-native Fabric/Forge pagination integration.
 
 ## 支持版本 / Supported versions
 
 | 项目 / Component | 版本 / Version |
 | --- | --- |
-| Mod | `26.2.0.0` |
-| Minecraft | `26.2` |
-| Java | `25+` |
-| Fabric | Loader `0.19.3+` + Fabric API；tested with `0.152.1+26.2` |
-| NeoForge | `26.2.0.1-beta+` |
+| Mod | `1.0.0` |
+| Minecraft | `1.20.1` |
+| Java | `17+` |
+| Fabric | Loader `0.16.9+` + Fabric API `0.92.1+1.20.1` |
+| Forge | `47.2.30+` |
 
 多人游戏需要客户端和服务端同时安装。Fabric 环境需要 Fabric API。
 
 Install the mod on both client and server for multiplayer. Fabric also requires Fabric API.
+
+## 1.20.1 实现说明 / Implementation notes
+
+- ItemStack JSON 使用固定的 `id`、`count` 和可选 `tag` 字段；`tag` 是
+  Minecraft 1.20.1 SNBT 字符串。
+- 公共网络模型使用 `FriendlyByteBuf`，Fabric 与 Forge 分别绑定自己的网络频道。
+- Fabric 使用 `visual_creative_tab_editor.accesswidener`；Forge 使用包含
+  SRG 成员名的 `META-INF/accesstransformer.cfg`。
+- 共享 Gradle 约定由 `buildSrc/` 提供。
+
+Item stacks use explicit `id`, `count`, and optional SNBT `tag` fields. Common
+payloads use `FriendlyByteBuf`, while each loader owns channel registration and
+thread dispatch.
 
 ## Wiki
 
@@ -47,20 +60,20 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 ## 构建 / Build
 
 ```powershell
-.\gradlew.bat :neoforge:runData
+.\gradlew.bat :forge:runData
 .\gradlew.bat build
 .\gradlew.bat :fabric:runClient
-.\gradlew.bat :neoforge:runClient
+.\gradlew.bat :forge:runClient
 ```
 
 构建产物：
 
 ```text
-fabric/build/libs/visual_creative_tab_editor-fabric-26.2-26.2.0.0.jar
-neoforge/build/libs/visual_creative_tab_editor-neoforge-26.2-26.2.0.0.jar
+fabric/build/libs/visual_creative_tab_editor-fabric-1.20.1-1.0.0.jar
+forge/build/libs/visual_creative_tab_editor-forge-1.20.1-1.0.0.jar
 ```
 
-Minecraft 26.2 使用 Java 25。Gradle toolchain resolver 可以在需要时提供配置的 JDK。
+Minecraft 1.20.1 分支使用 Java 17。项目的共享 Gradle 约定位于 `buildSrc/`。
 
 ## License
 

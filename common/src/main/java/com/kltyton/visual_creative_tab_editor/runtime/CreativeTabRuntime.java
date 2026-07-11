@@ -4,6 +4,7 @@ import com.kltyton.visual_creative_tab_editor.data.CreativeTabCatalog;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabDefinition;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -12,13 +13,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Set;
-import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.world.item.Item;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
@@ -26,7 +26,7 @@ import net.minecraft.world.item.ItemStack;
 /** Thread-safe runtime projection of the current server-authoritative tab catalog. */
 public final class CreativeTabRuntime {
     private static final AtomicReference<State> ACTIVE = new AtomicReference<>(State.empty());
-    private static final AtomicReference<Map<Identifier, CreativeModeTab>> PREVIEW_HANDOFF = new AtomicReference<>();
+    private static final AtomicReference<Map<ResourceLocation, CreativeModeTab>> PREVIEW_HANDOFF = new AtomicReference<>();
     private static final ThreadLocal<State> PREVIEW = new ThreadLocal<>();
     private static final ThreadLocal<Integer> NATIVE_BYPASS = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<CreativeModeTab> FORCED_VISIBLE_TAB = new ThreadLocal<>();
@@ -35,7 +35,7 @@ public final class CreativeTabRuntime {
     }
 
     public static void install(CreativeTabCatalog catalog) {
-        Map<Identifier, CreativeModeTab> handoff = PREVIEW_HANDOFF.getAndSet(null);
+        Map<ResourceLocation, CreativeModeTab> handoff = PREVIEW_HANDOFF.getAndSet(null);
         ACTIVE.updateAndGet(previous -> State.create(catalog, previous, handoff));
         CreativeModeTabs.CACHED_PARAMETERS = null;
     }
@@ -111,13 +111,13 @@ public final class CreativeTabRuntime {
         }
     }
 
-    public static Optional<Identifier> id(CreativeModeTab tab) {
-        Identifier registered = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+    public static Optional<ResourceLocation> id(CreativeModeTab tab) {
+        ResourceLocation registered = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
         if (registered != null) {
             return Optional.of(registered);
         }
         State preview = PREVIEW.get();
-        Identifier previewId = preview == null ? null : preview.idsByRuntimeTab.get(tab);
+        ResourceLocation previewId = preview == null ? null : preview.idsByRuntimeTab.get(tab);
         return Optional.ofNullable(previewId != null ? previewId : ACTIVE.get().idsByRuntimeTab.get(tab));
     }
 
@@ -133,9 +133,9 @@ public final class CreativeTabRuntime {
             return nativeTabs;
         }
         List<CreativeModeTab> nativeList = nativeTabs.toList();
-        Map<Identifier, CreativeModeTab> byId = new LinkedHashMap<>();
+        Map<ResourceLocation, CreativeModeTab> byId = new LinkedHashMap<>();
         for (CreativeModeTab tab : nativeList) {
-            Identifier id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+            ResourceLocation id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
             if (id != null) {
                 byId.put(id, tab);
             }
@@ -163,32 +163,49 @@ public final class CreativeTabRuntime {
         Collection<ItemStack> searchable = search.getSearchTabDisplayItems();
         display.clear();
         searchable.clear();
-        Map<StackKey, ItemStack> aggregate = new LinkedHashMap<>();
+        Map<Item, List<ItemStack>> aggregateByItem = new LinkedHashMap<>();
+        List<ItemStack> insertionOrder = new ArrayList<>();
         effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream()).forEach(tab -> {
             if (tab != search && definition(tab).map(definition -> !definition.hidden()).orElse(true)) {
                 for (ItemStack stack : tab.getSearchTabDisplayItems()) {
-                    aggregate.putIfAbsent(StackKey.of(stack), stack);
+                    List<ItemStack> bucket = aggregateByItem.computeIfAbsent(stack.getItem(), ignored -> new ArrayList<>());
+                    if (bucket.stream().noneMatch(candidate -> ItemStack.isSameItemSameTags(candidate, stack))) {
+                        bucket.add(stack);
+                        insertionOrder.add(stack);
+                    }
                 }
             }
         });
-        List<ItemStack> ordered = new ArrayList<>(aggregate.size());
+        List<ItemStack> ordered = new ArrayList<>(insertionOrder.size());
+        Set<ItemStack> selected = Collections.newSetFromMap(new IdentityHashMap<>());
         definition(search).ifPresent(definition -> {
             for (ItemStack preferred : definition.items()) {
-                ItemStack present = aggregate.remove(StackKey.of(preferred));
-                if (present != null) {
-                    ordered.add(present);
+                List<ItemStack> bucket = aggregateByItem.get(preferred.getItem());
+                if (bucket == null) {
+                    continue;
+                }
+                for (ItemStack candidate : bucket) {
+                    if (!selected.contains(candidate) && ItemStack.isSameItemSameTags(candidate, preferred)) {
+                        selected.add(candidate);
+                        ordered.add(candidate);
+                        break;
+                    }
                 }
             }
         });
-        ordered.addAll(aggregate.values());
+        for (ItemStack stack : insertionOrder) {
+            if (selected.add(stack)) {
+                ordered.add(stack);
+            }
+        }
         display.addAll(ordered);
         searchable.addAll(ordered);
     }
 
     private record State(
             CreativeTabCatalog catalog,
-            Map<Identifier, CreativeModeTab> runtimeTabs,
-            Map<CreativeModeTab, Identifier> idsByRuntimeTab
+            Map<ResourceLocation, CreativeModeTab> runtimeTabs,
+            Map<CreativeModeTab, ResourceLocation> idsByRuntimeTab
     ) {
         private static State empty() {
             return new State(CreativeTabCatalog.EMPTY, Map.of(), Map.of());
@@ -202,10 +219,10 @@ public final class CreativeTabRuntime {
         private static State create(
                 CreativeTabCatalog catalog,
                 State previous,
-                Map<Identifier, CreativeModeTab> handoff
+                Map<ResourceLocation, CreativeModeTab> handoff
         ) {
-            Map<Identifier, CreativeModeTab> runtime = new LinkedHashMap<>();
-            Map<CreativeModeTab, Identifier> reverse = new IdentityHashMap<>();
+            Map<ResourceLocation, CreativeModeTab> runtime = new LinkedHashMap<>();
+            Map<CreativeModeTab, ResourceLocation> reverse = new IdentityHashMap<>();
             for (CreativeTabDefinition definition : catalog.orderedDefinitions()) {
                 if (BuiltInRegistries.CREATIVE_MODE_TAB.getOptional(definition.id()).isPresent()
                         || definition.type() != CreativeTabType.CATEGORY) {
@@ -225,12 +242,6 @@ public final class CreativeTabRuntime {
                 reverse.put(tab, definition.id());
             }
             return new State(catalog, Map.copyOf(runtime), Map.copyOf(reverse));
-        }
-    }
-
-    private record StackKey(Item item, DataComponentMap components) {
-        private static StackKey of(ItemStack stack) {
-            return new StackKey(stack.getItem(), stack.getComponents());
         }
     }
 }

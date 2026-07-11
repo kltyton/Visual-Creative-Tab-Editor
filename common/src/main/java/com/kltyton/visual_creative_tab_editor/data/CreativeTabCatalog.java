@@ -8,13 +8,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Immutable, fully resolved creative-tab catalog for one resource-pack view. */
 public final class CreativeTabCatalog {
     public static final CreativeTabCatalog EMPTY = new CreativeTabCatalog(List.of(), false);
 
-    private final Map<Identifier, CreativeTabDefinition> definitions;
+    private final Map<ResourceLocation, CreativeTabDefinition> definitions;
     private final List<CreativeTabDefinition> ordered;
 
     public CreativeTabCatalog(Collection<CreativeTabDefinition> definitions) {
@@ -23,7 +23,7 @@ public final class CreativeTabCatalog {
 
     private CreativeTabCatalog(Collection<CreativeTabDefinition> definitions, boolean requireVisibleCategory) {
         Objects.requireNonNull(definitions, "definitions");
-        Map<Identifier, CreativeTabDefinition> byId = new LinkedHashMap<>();
+        Map<ResourceLocation, CreativeTabDefinition> byId = new LinkedHashMap<>();
         for (CreativeTabDefinition definition : definitions) {
             CreativeTabDefinition previous = byId.put(definition.id(), definition);
             if (previous != null) {
@@ -40,7 +40,7 @@ public final class CreativeTabCatalog {
         this.ordered = List.copyOf(sorted);
     }
 
-    public Optional<CreativeTabDefinition> definition(Identifier id) {
+    public Optional<CreativeTabDefinition> definition(ResourceLocation id) {
         return Optional.ofNullable(this.definitions.get(id));
     }
 
@@ -48,7 +48,7 @@ public final class CreativeTabCatalog {
         return this.ordered;
     }
 
-    public Map<Identifier, CreativeTabDefinition> definitions() {
+    public Map<ResourceLocation, CreativeTabDefinition> definitions() {
         return this.definitions;
     }
 

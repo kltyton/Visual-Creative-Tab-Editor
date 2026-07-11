@@ -10,6 +10,17 @@ The resource path is also the tab identifier. For example,
 `data/example/creative_tabs/building/favorites.json` defines
 `example:building/favorites`.
 
+For Minecraft 1.20.1, a hand-written pack uses data-pack format 15:
+
+```json
+{
+  "pack": {
+    "pack_format": 15,
+    "description": "Creative tab overrides"
+  }
+}
+```
+
 ## Layering
 
 Fields are merged independently in the real selected-pack order, from lowest to
@@ -41,11 +52,19 @@ rebuilt global Search tab while preserving the tab identity.
   "icon": { "id": "minecraft:diamond", "count": 1 },
   "items": [
     { "id": "minecraft:diamond", "count": 1 },
-    { "id": "minecraft:enchanted_golden_apple", "count": 1 }
+    {
+      "id": "minecraft:diamond_sword",
+      "count": 1,
+      "tag": "{Damage:7}"
+    }
   ],
   "search_items": [
     { "id": "minecraft:diamond", "count": 1 },
-    { "id": "minecraft:enchanted_golden_apple", "count": 1 }
+    {
+      "id": "minecraft:diamond_sword",
+      "count": 1,
+      "tag": "{Damage:7}"
+    }
   ],
   "hidden": false,
   "order": 20,
@@ -57,11 +76,20 @@ rebuilt global Search tab while preserving the tab identity.
 }
 ```
 
-`title` uses Minecraft's component JSON. `icon`, `items`, and `search_items` use the
-Minecraft 26.2 `ItemStack` codec, so data components are preserved. Stack counts
-must be exactly one. For category tabs, `items` is the visible parent-tab list and
-`search_items` is its independent contribution to global search; this preserves
-Minecraft's parent-only and search-only entries.
+`title` uses Minecraft 1.20.1 component JSON and is read with
+`Component.Serializer`. Each `icon`, `items`, or `search_items` entry is an
+explicit object with these fields:
+
+- `id`: required registered item ID.
+- `count`: optional integer that defaults to `1`; resolved creative-tab data
+  requires exactly `1`.
+- `tag`: optional SNBT string containing the 1.20.1 ItemStack `CompoundTag`.
+
+The `tag` value is a JSON string, not a nested JSON object. It preserves legacy
+1.20.1 NBT such as enchantments, custom names, damage, and other item tags. For
+category tabs, `items` is the visible parent-tab list and `search_items` is its
+independent contribution to global search; this preserves Minecraft's
+parent-only and search-only entries.
 
 Layers merge field by field from low to high priority. A missing field inherits
 the lower value; a present field replaces it as a whole. Arrays are not appended,
@@ -86,8 +114,8 @@ mods, are appended automatically.
 - 512 tabs per resolved catalog.
 - 4096 stacks in `items` and 4096 stacks in `search_items` per tab, with 65536
   configured stacks total across the catalog.
-- Unknown fields, invalid identifiers, empty stacks, invalid components, and
-  unsupported schema versions fail the resource reload.
+- Unknown fields, invalid identifiers, empty stacks, invalid Component JSON,
+  invalid SNBT, and unsupported schema versions fail the resource reload.
 - Stale entries in the two reserved, Mod-owned world packs are skipped instead
   of preventing world startup (for example after a Mod is removed). The default
   pack is regenerated at server start; third-party packs remain strictly

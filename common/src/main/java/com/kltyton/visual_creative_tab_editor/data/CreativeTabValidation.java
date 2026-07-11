@@ -1,7 +1,7 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Collection;
@@ -21,10 +21,10 @@ public final class CreativeTabValidation {
     public static final int MAX_COMPONENT_TEXT_LENGTH = 32_768;
     public static final int MAX_CODEC_JSON_LENGTH = 131_072;
     public static final int MAX_DOCUMENT_JSON_LENGTH = 2_097_152;
-    private static final Map<Identifier, CreativeTabType> FIXED_VANILLA_TYPES = Map.of(
-            Identifier.withDefaultNamespace("hotbar"), CreativeTabType.HOTBAR,
-            Identifier.withDefaultNamespace("search"), CreativeTabType.SEARCH,
-            Identifier.withDefaultNamespace("inventory"), CreativeTabType.INVENTORY
+    private static final Map<ResourceLocation, CreativeTabType> FIXED_VANILLA_TYPES = Map.of(
+            new ResourceLocation("minecraft", "hotbar"), CreativeTabType.HOTBAR,
+            new ResourceLocation("minecraft", "search"), CreativeTabType.SEARCH,
+            new ResourceLocation("minecraft", "inventory"), CreativeTabType.INVENTORY
     );
 
     private CreativeTabValidation() {
@@ -40,7 +40,7 @@ public final class CreativeTabValidation {
             throw new IllegalArgumentException("Too many creative tabs: " + definitions.size() + " > " + MAX_TABS);
         }
 
-        Set<Identifier> ids = new HashSet<>();
+        Set<ResourceLocation> ids = new HashSet<>();
         long totalItems = 0;
         boolean hasVisibleCategory = false;
         for (CreativeTabDefinition definition : definitions) {

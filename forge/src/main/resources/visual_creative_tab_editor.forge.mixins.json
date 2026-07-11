@@ -1,8 +1,9 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "com.kltyton.visual_creative_tab_editor.mixin.neoforge",
-  "compatibilityLevel": "JAVA_25",
+  "package": "com.kltyton.visual_creative_tab_editor.mixin.forge",
+  "refmap": "${mod_id}.refmap.json",
+  "compatibilityLevel": "JAVA_17",
   "mixins": [
     "CreativeModeTabRegistryMixin"
   ],

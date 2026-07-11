@@ -1,7 +1,7 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ public record CreativeTabPatch(
         Optional<Boolean> canScroll,
         Optional<Boolean> showTitle,
         Optional<Boolean> alignedRight,
-        Optional<Identifier> background
+        Optional<ResourceLocation> background
 ) {
     /** Current JSON schema version. */
     public static final int CURRENT_FORMAT = 1;
@@ -54,7 +54,7 @@ public record CreativeTabPatch(
             Optional<Boolean> canScroll,
             Optional<Boolean> showTitle,
             Optional<Boolean> alignedRight,
-            Optional<Identifier> background
+            Optional<ResourceLocation> background
     ) {
         this(format, title, icon, items, Optional.empty(), hidden, order, type,
                 canScroll, showTitle, alignedRight, background);

@@ -1,4 +1,4 @@
-classTweaker v1 official
+accessWidener v2 named
 
 # Creative inventory editor state and helpers.
 # Call sites: CreativeModeInventoryScreenEditorMixin and CreativeTabEditorController.
@@ -13,7 +13,7 @@ accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInvento
 accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$ItemPickerMenu getRowIndexForScroll (F)I
 accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$ItemPickerMenu getScrollForRowIndex (I)F
 
-# Data-driven pagination rewrites the vanilla tab coordinates after loader validation.
+# Data-driven pagination rewrites the vanilla final tab coordinates after Fabric's bootstrap validation.
 # Call sites: FabricCreativeTabPages and CreativeModeInventoryScreenEditorMixin.
 accessible field net/minecraft/world/item/CreativeModeTab row Lnet/minecraft/world/item/CreativeModeTab$Row;
 mutable field net/minecraft/world/item/CreativeModeTab row Lnet/minecraft/world/item/CreativeModeTab$Row;
@@ -21,9 +21,9 @@ accessible field net/minecraft/world/item/CreativeModeTab column I
 mutable field net/minecraft/world/item/CreativeModeTab column I
 
 # Preview changes invalidate vanilla's creative contents cache before the next client tick rebuild.
-# Call sites: CreativeTabRuntime and FabricCreativeModeInventoryScreenMixin.
+# Call site: CreativeTabRuntime.
 accessible field net/minecraft/world/item/CreativeModeTabs CACHED_PARAMETERS Lnet/minecraft/world/item/CreativeModeTab$ItemDisplayParameters;
 
-# ServerPacksSource has no public way to preserve its existing repository sources while adding the pinned world-pack source.
+# PackRepository has no public way to preserve its existing repository sources while adding the pinned world-pack source.
 # Call site: ServerPacksSourceMixin.
 accessible field net/minecraft/server/packs/repository/PackRepository sources Ljava/util/Set;

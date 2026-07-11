@@ -8,20 +8,20 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Re-paginates data-driven and unregistered runtime tabs for Fabric's native page API. */
+/** Re-paginates data-driven and unregistered runtime tabs for Fabric API 0.92's page fields. */
 @Mixin(value = CreativeModeTabs.class, priority = 500)
 public abstract class FabricCreativeModeTabsMixin {
     @Inject(method = "buildAllTabContents", at = @At("HEAD"))
-    private static void visualCreativeTabEditor$restoreFabricValidationLayout(
+    private static void visualCreativeTabEditor$restoreFabricBaseline(
             CreativeModeTab.ItemDisplayParameters parameters,
             CallbackInfo callback
     ) {
-        FabricCreativeTabPages.restoreVanillaBaselineForValidation();
+        FabricCreativeTabPages.restoreVanillaBaselineBeforeRepack();
     }
 
-    // Fabric's own paginator uses the default injector order (1000) and validates registered tabs.
-    // Runtime-only tabs are repacked afterwards because Fabric cannot see them in the registry.
-    @Inject(method = "buildAllTabContents", at = @At("TAIL"), order = 1100)
+    // Fabric's bootstrap paginator only sees registered groups. Runtime-only tabs are repacked
+    // after each content rebuild so its native page buttons can discover them through tabs().
+    @Inject(method = "buildAllTabContents", at = @At("TAIL"))
     private static void visualCreativeTabEditor$repackFabricPages(
             CreativeModeTab.ItemDisplayParameters parameters,
             CallbackInfo callback

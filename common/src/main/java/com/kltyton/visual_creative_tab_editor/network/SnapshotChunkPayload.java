@@ -2,10 +2,8 @@ package com.kltyton.visual_creative_tab_editor.network;
 
 import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import io.netty.handler.codec.DecoderException;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
 
 /** One bounded chunk of a server-authoritative creative-tab snapshot. */
 public record SnapshotChunkPayload(
@@ -15,13 +13,9 @@ public record SnapshotChunkPayload(
         int total,
         int uncompressedSize,
         byte[] chunk
-) implements CustomPacketPayload {
-    public static final Type<SnapshotChunkPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "snapshot_chunk")
-    );
-
-    public static final StreamCodec<RegistryFriendlyByteBuf, SnapshotChunkPayload> STREAM_CODEC =
-            CustomPacketPayload.codec(SnapshotChunkPayload::write, SnapshotChunkPayload::decode);
+) implements CreativeTabPayload {
+    public static final ResourceLocation ID =
+            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "snapshot_chunk");
 
     public SnapshotChunkPayload {
         if (revision < 0) {
@@ -38,11 +32,12 @@ public record SnapshotChunkPayload(
     }
 
     @Override
-    public Type<SnapshotChunkPayload> type() {
-        return TYPE;
+    public ResourceLocation id() {
+        return ID;
     }
 
-    private void write(RegistryFriendlyByteBuf buffer) {
+    @Override
+    public void write(FriendlyByteBuf buffer) {
         buffer.writeVarLong(revision);
         buffer.writeBoolean(canEdit);
         buffer.writeVarInt(index);
@@ -51,7 +46,7 @@ public record SnapshotChunkPayload(
         buffer.writeByteArray(chunk);
     }
 
-    private static SnapshotChunkPayload decode(RegistryFriendlyByteBuf buffer) {
+    public static SnapshotChunkPayload decode(FriendlyByteBuf buffer) {
         try {
             return new SnapshotChunkPayload(
                     buffer.readVarLong(),

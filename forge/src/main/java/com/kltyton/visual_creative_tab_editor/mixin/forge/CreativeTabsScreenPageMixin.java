@@ -1,20 +1,20 @@
-package com.kltyton.visual_creative_tab_editor.mixin.neoforge;
+package com.kltyton.visual_creative_tab_editor.mixin.forge;
 
 import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
-import net.neoforged.neoforge.client.gui.CreativeTabsScreenPage;
+import net.minecraftforge.client.gui.CreativeTabsScreenPage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Applies data order to the page view while retaining NeoForge's native special-tab anchors. */
+/** Applies data order to a Forge page while retaining its native special-tab anchors. */
 @Mixin(value = CreativeTabsScreenPage.class, remap = false)
 public abstract class CreativeTabsScreenPageMixin {
     @Inject(method = "getVisibleTabs", at = @At("RETURN"), cancellable = true)
@@ -33,7 +33,7 @@ public abstract class CreativeTabsScreenPageMixin {
         }
         List<CreativeModeTab> visible = ((CreativeTabsScreenPage) (Object) this).getVisibleTabs();
         if (!visible.isEmpty()) {
-            callback.setReturnValue(visible.getFirst());
+            callback.setReturnValue(visible.get(0));
         }
     }
 
@@ -47,7 +47,7 @@ public abstract class CreativeTabsScreenPageMixin {
         for (int index = 0; index < ordered.size(); index++) {
             nativeOrder.put(ordered.get(index), index);
         }
-        Map<Identifier, Integer> configuredOrder = new HashMap<>();
+        Map<ResourceLocation, Integer> configuredOrder = new HashMap<>();
         var definitions = CreativeTabRuntime.catalog().orderedDefinitions();
         for (int index = 0; index < definitions.size(); index++) {
             configuredOrder.put(definitions.get(index).id(), index);

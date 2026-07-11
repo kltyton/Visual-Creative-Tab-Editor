@@ -4,12 +4,9 @@ import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import io.netty.handler.codec.DecoderException;
 import java.util.Objects;
 import java.util.UUID;
-import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server acknowledgement for one completed edit transaction. */
 public record EditResultPayload(
@@ -18,13 +15,9 @@ public record EditResultPayload(
         long revision,
         boolean canEdit,
         Component message
-) implements CustomPacketPayload {
-    public static final Type<EditResultPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_result")
-    );
-
-    public static final StreamCodec<RegistryFriendlyByteBuf, EditResultPayload> STREAM_CODEC =
-            CustomPacketPayload.codec(EditResultPayload::write, EditResultPayload::decode);
+) implements CreativeTabPayload {
+    public static final ResourceLocation ID =
+            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "edit_result");
 
     public EditResultPayload {
         Objects.requireNonNull(sessionId, "sessionId");
@@ -35,26 +28,27 @@ public record EditResultPayload(
     }
 
     @Override
-    public Type<EditResultPayload> type() {
-        return TYPE;
+    public ResourceLocation id() {
+        return ID;
     }
 
-    private void write(RegistryFriendlyByteBuf buffer) {
+    @Override
+    public void write(FriendlyByteBuf buffer) {
         buffer.writeUUID(sessionId);
         buffer.writeBoolean(success);
         buffer.writeVarLong(revision);
         buffer.writeBoolean(canEdit);
-        ComponentSerialization.STREAM_CODEC.encode(buffer, message);
+        buffer.writeComponent(message);
     }
 
-    private static EditResultPayload decode(RegistryFriendlyByteBuf buffer) {
+    public static EditResultPayload decode(FriendlyByteBuf buffer) {
         try {
             return new EditResultPayload(
                     buffer.readUUID(),
                     buffer.readBoolean(),
                     buffer.readVarLong(),
                     buffer.readBoolean(),
-                    ComponentSerialization.STREAM_CODEC.decode(buffer)
+                    buffer.readComponent()
             );
         } catch (DecoderException exception) {
             throw exception;

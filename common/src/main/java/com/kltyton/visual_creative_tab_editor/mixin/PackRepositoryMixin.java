@@ -34,7 +34,7 @@ public abstract class PackRepositoryMixin {
         if (top) {
             packs.add(pinned);
         } else {
-            packs.addFirst(pinned);
+            packs.add(0, pinned);
         }
     }
 }

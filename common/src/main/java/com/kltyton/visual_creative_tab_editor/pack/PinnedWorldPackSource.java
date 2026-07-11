@@ -2,11 +2,8 @@ package com.kltyton.visual_creative_tab_editor.pack;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 import java.util.function.Consumer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packs.PackLocationInfo;
-import net.minecraft.server.packs.PackSelectionConfig;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.PathPackResources;
 import net.minecraft.server.packs.repository.Pack;
@@ -22,11 +19,6 @@ public final class PinnedWorldPackSource implements RepositorySource {
     public static final String DEFAULT_PACK_ID = "file/" + DEFAULT_DIRECTORY;
     public static final String PLAYER_PACK_ID = "file/" + PLAYER_DIRECTORY;
 
-    private static final PackSelectionConfig DEFAULT_SELECTION =
-            new PackSelectionConfig(true, Pack.Position.BOTTOM, true);
-    private static final PackSelectionConfig PLAYER_SELECTION =
-            new PackSelectionConfig(true, Pack.Position.TOP, true);
-
     private final Path datapackDirectory;
 
     public PinnedWorldPackSource(Path datapackDirectory) {
@@ -40,14 +32,14 @@ public final class PinnedWorldPackSource implements RepositorySource {
                 DEFAULT_DIRECTORY,
                 LEGACY_DEFAULT_DIRECTORY,
                 DEFAULT_PACK_ID,
-                DEFAULT_SELECTION
+                Pack.Position.BOTTOM
         );
         loadPreferred(
                 consumer,
                 PLAYER_DIRECTORY,
                 LEGACY_PLAYER_DIRECTORY,
                 PLAYER_PACK_ID,
-                PLAYER_SELECTION
+                Pack.Position.TOP
         );
     }
 
@@ -56,32 +48,29 @@ public final class PinnedWorldPackSource implements RepositorySource {
             String currentDirectory,
             String legacyDirectory,
             String packId,
-            PackSelectionConfig selection
+            Pack.Position position
     ) {
         Path currentRoot = this.datapackDirectory.resolve(currentDirectory).normalize();
         String selectedDirectory = Files.isRegularFile(currentRoot.resolve("pack.mcmeta"))
                 ? currentDirectory
                 : legacyDirectory;
-        load(consumer, selectedDirectory, packId, selection);
+        load(consumer, selectedDirectory, packId, position);
     }
 
-    private void load(Consumer<Pack> consumer, String directoryName, String packId, PackSelectionConfig selection) {
+    private void load(Consumer<Pack> consumer, String directoryName, String packId, Pack.Position position) {
         Path root = this.datapackDirectory.resolve(directoryName).normalize();
         if (!root.startsWith(this.datapackDirectory) || !Files.isRegularFile(root.resolve("pack.mcmeta"))) {
             return;
         }
 
-        PackLocationInfo location = new PackLocationInfo(
+        Pack pack = Pack.readMetaAndCreate(
                 packId,
                 Component.literal(directoryName),
-                PackSource.WORLD,
-                Optional.empty()
-        );
-        Pack pack = Pack.readMetaAndCreate(
-                location,
-                new PathPackResources.PathResourcesSupplier(root),
+                true,
+                openedId -> new PathPackResources(openedId, root, false),
                 PackType.SERVER_DATA,
-                selection
+                position,
+                PackSource.WORLD
         );
         if (pack != null) {
             consumer.accept(pack);
