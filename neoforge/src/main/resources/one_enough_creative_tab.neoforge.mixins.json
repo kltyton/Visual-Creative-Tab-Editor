@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.kltyton.one_enough_creative_tab.mixin.neoforge",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "CreativeModeTabRegistryMixin"
+  ],
+  "client": [
+    "CreativeTabsScreenPageMixin"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

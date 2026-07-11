@@ -9,9 +9,9 @@ dependencies {
 }
 
 loom {
-    def aw = project(':common').file("src/main/resources/${mod_id}.accesswidener")
-    if (aw.exists()) {
-        accessWidenerPath.set(aw)
+    def classTweaker = project(':common').file("src/main/resources/${mod_id}.classtweaker")
+    if (classTweaker.exists()) {
+        accessWidenerPath.set(classTweaker)
     }
     runs {
         client {

@@ -12,8 +12,16 @@
     "entrypoints": {
         "main": [
             "com.kltyton.one_enough_creative_tab.OneEnoughCreativeTab"
+        ],
+        "client": [
+            "com.kltyton.one_enough_creative_tab.OneEnoughCreativeTabClient"
         ]
     },
+    "mixins": [
+        "one_enough_creative_tab.mixins.json",
+        "one_enough_creative_tab.fabric.mixins.json"
+    ],
+    "accessWidener": "${mod_id}.classtweaker",
     "depends": {
         "fabricloader": ">=${fabric_loader_version}",
         "fabric-api": "*",

@@ -7,6 +7,19 @@ version = "${version}" #mandatory
 displayName = "${mod_name}" #mandatory
 authors = "${mod_author}" #optional
 description = '''${description}''' #mandatory (Supports multiline text)
+
+[[mixins]]
+config = "one_enough_creative_tab.mixins.json"
+
+[[mixins]]
+config = "one_enough_creative_tab.neoforge.mixins.json"
+
+[[accessTransformers]]
+file = "META-INF/accesstransformer.cfg"
+
+[[accessTransformers]]
+file = "META-INF/neoforge-accesstransformer.cfg"
+
 [[dependencies.${mod_id}]] #optional
 modId = "neoforge" #mandatory
 type="required" #mandatory (Can be one of "required", "optional", "incompatible" or "discouraged")
