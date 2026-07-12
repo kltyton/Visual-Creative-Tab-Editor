@@ -24,7 +24,7 @@ and loader-native Fabric/Forge pagination integration.
 
 | 项目 / Component | 版本 / Version |
 | --- | --- |
-| Mod | `1.0.0` |
+| Mod | `2.0.1` |
 | Minecraft | `1.20.1` |
 | Java | `17+` |
 | Fabric | Loader `0.16.9+` + Fabric API `0.92.1+1.20.1` |
@@ -69,8 +69,8 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 构建产物：
 
 ```text
-fabric/build/libs/visual_creative_tab_editor-fabric-1.20.1-1.0.0.jar
-forge/build/libs/visual_creative_tab_editor-forge-1.20.1-1.0.0.jar
+fabric/build/libs/visual_creative_tab_editor-fabric-1.20.1-2.0.1.jar
+forge/build/libs/visual_creative_tab_editor-forge-1.20.1-2.0.1.jar
 ```
 
 Minecraft 1.20.1 分支使用 Java 17。项目的共享 Gradle 约定位于 `buildSrc/`。

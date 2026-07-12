@@ -17,6 +17,7 @@ import com.kltyton.visual_creative_tab_editor.network.EditResultPayload;
 import com.kltyton.visual_creative_tab_editor.network.PayloadChunks;
 import com.kltyton.visual_creative_tab_editor.network.SnapshotChunkPayload;
 import com.kltyton.visual_creative_tab_editor.pack.PinnedWorldPackSource;
+import com.kltyton.visual_creative_tab_editor.platform.CreativeTabNativeBackground;
 import com.kltyton.visual_creative_tab_editor.platform.CreativeTabNativeOrder;
 import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
 import java.io.IOException;
@@ -441,6 +442,15 @@ public final class CreativeTabServerManager {
                     List<ItemStack> searchItems = tab.getType() == CreativeModeTab.Type.CATEGORY
                             ? tab.getSearchTabDisplayItems().stream().map(stack -> stack.copyWithCount(1)).toList()
                             : List.of();
+                    ResourceLocation background = CreativeTabNativeBackground.resolve(tab);
+                    if (tab.getType() != CreativeModeTab.Type.CATEGORY) {
+                        VisualCreativeTabEditorConstants.LOGGER.info(
+                                "Captured native system creative tab id={} type={} background={}",
+                                id,
+                                tab.getType(),
+                                background
+                        );
+                    }
                     definitions.add(new CreativeTabDefinition(
                             id,
                             CreativeTabPatch.CURRENT_FORMAT,
@@ -455,10 +465,7 @@ public final class CreativeTabServerManager {
                                     tab.canScroll(),
                                     tab.showTitle(),
                                     tab.isAlignedRight(),
-                                    new ResourceLocation(
-                                            "minecraft",
-                                            "textures/gui/container/creative_inventory/tab_" + tab.getBackgroundSuffix()
-                                    )
+                                    background
                             )
                     ));
                 }

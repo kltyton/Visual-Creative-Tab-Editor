@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Makes Fabric API 0.92's page buttons follow the effective data-driven tab catalog. */
-@Mixin(value = CreativeModeInventoryScreen.class, priority = 500)
+@Mixin(value = CreativeModeInventoryScreen.class, priority = 2000)
 public abstract class FabricCreativeModeInventoryScreenMixin {
     @Inject(method = "fabric_isButtonVisible", at = @At("HEAD"), cancellable = true, remap = false)
     private void visualCreativeTabEditor$useRuntimePageCountForVisibility(

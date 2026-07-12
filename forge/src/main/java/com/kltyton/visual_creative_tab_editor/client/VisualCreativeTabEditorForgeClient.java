@@ -11,6 +11,7 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.gui.CreativeTabsScreenPage;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.eventbus.api.EventPriority;
 
 /** Client-only Forge paging, refresh and connection bootstrap. */
 public final class VisualCreativeTabEditorForgeClient {
@@ -19,7 +20,7 @@ public final class VisualCreativeTabEditorForgeClient {
 
     /** Installs client-only hooks after the physical-side guard in the mod entrypoint. */
     public static void register() {
-        MinecraftForge.EVENT_BUS.addListener(VisualCreativeTabEditorForgeClient::loggingOut);
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditorForgeClient::loggingOut);
         CreativeTabNetworkBridge.installClientSender(VisualCreativeTabEditorForgeNetwork::sendToServer);
         CreativeTabClientPlatform.preserveNativeTabPositions();
         CreativeTabClientPlatform.installVisibleTabsProvider(screen -> screen.getCurrentPage().getVisibleTabs());
