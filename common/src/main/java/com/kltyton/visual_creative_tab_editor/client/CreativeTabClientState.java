@@ -50,6 +50,14 @@ public final class CreativeTabClientState {
             canEdit = pending.canEdit;
             base = decodedBase;
             resolved = decodedResolved;
+            VisualCreativeTabEditorConstants.LOGGER.info(
+                    "[EditorTrace] snapshot-applied revision={} canEdit={} baseTabs={} resolvedTabs={} chunks={}",
+                    revision,
+                    canEdit,
+                    base.orderedDefinitions().size(),
+                    resolved.orderedDefinitions().size(),
+                    pending.chunks.length
+            );
             pending = null;
             CreativeTabRuntime.install(decodedResolved);
         } catch (RuntimeException exception) {

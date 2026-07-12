@@ -104,6 +104,16 @@ public final class CreativeTabServerManager {
                 prepared.snapshot().uncompressedSize(),
                 prepared.snapshot().chunks()
         );
+        VisualCreativeTabEditorConstants.LOGGER.info(
+                "[EditorTrace] creative-tab-reload-applied baseTabs={} resolvedTabs={} defaultPresent={} "
+                        + "revision={} snapshotChunks={} mutation={}",
+                base.orderedDefinitions().size(),
+                resolved.orderedDefinitions().size(),
+                defaultPresent,
+                revision,
+                prepared.snapshot().chunks().size(),
+                currentMutationEpoch
+        );
     }
 
     public static void onServerStarted(MinecraftServer startedServer) {
@@ -165,6 +175,12 @@ public final class CreativeTabServerManager {
 
     public static void syncTo(ServerPlayer player) {
         if (!defaultPresent || resolved.isEmpty()) {
+            VisualCreativeTabEditorConstants.LOGGER.warn(
+                    "[EditorTrace] snapshot-sync-skipped player={} defaultPresent={} resolvedTabs={} reason=unavailable-catalog",
+                    player.getScoreboardName(),
+                    defaultPresent,
+                    resolved.orderedDefinitions().size()
+            );
             return;
         }
         try {
@@ -313,7 +329,7 @@ public final class CreativeTabServerManager {
                 VisualCreativeTabEditorConstants.LOGGER.error("Failed to retry a stale creative-tab reload", exception);
             }
         }
-        if (!defaultPresent || ++permissionCheckTicks < 20) {
+        if (!defaultPresent || resolved.isEmpty() || ++permissionCheckTicks < 20) {
             return;
         }
         permissionCheckTicks = 0;
@@ -426,6 +442,13 @@ public final class CreativeTabServerManager {
             }
         }
         SYNC_STATE.put(player.getUUID(), new SyncState(snapshot.revision(), canEdit));
+        VisualCreativeTabEditorConstants.LOGGER.info(
+                "[EditorTrace] snapshot-sent player={} revision={} canEdit={} chunks={}",
+                player.getScoreboardName(),
+                snapshot.revision(),
+                canEdit,
+                snapshot.chunks().size()
+        );
         return true;
     }
 
@@ -481,12 +504,62 @@ public final class CreativeTabServerManager {
     public static CompletableFuture<Void> reloadWorldPacks(MinecraftServer target) {
         PackRepository repository = target.getPackRepository();
         repository.reload();
-        List<String> orderedIds = repository.getSelectedPacks().stream().map(Pack::getId).toList();
+        List<String> orderedIds = pinnedReloadPackIds(repository);
         return target.reloadResources(orderedIds).whenComplete((unused, throwable) -> {
             if (throwable != null) {
                 VisualCreativeTabEditorConstants.LOGGER.error("Creative-tab data pack reload failed", throwable);
+                return;
             }
+            VisualCreativeTabEditorConstants.LOGGER.info(
+                    "[EditorTrace] creative-tab-reload-complete defaultPresent={} baseTabs={} resolvedTabs={} "
+                            + "revision={} defaultSelected={} playerSelected={}",
+                    defaultPresent,
+                    base.orderedDefinitions().size(),
+                    resolved.orderedDefinitions().size(),
+                    REVISION.get(),
+                    repository.getSelectedIds().contains(PinnedWorldPackSource.DEFAULT_PACK_ID),
+                    repository.getSelectedIds().contains(PinnedWorldPackSource.PLAYER_PACK_ID)
+            );
         });
+    }
+
+    private static List<String> pinnedReloadPackIds(PackRepository repository) {
+        List<String> selectedBefore = repository.getSelectedPacks().stream().map(Pack::getId).toList();
+        boolean defaultSelectedBefore = selectedBefore.contains(PinnedWorldPackSource.DEFAULT_PACK_ID);
+        boolean playerSelectedBefore = selectedBefore.contains(PinnedWorldPackSource.PLAYER_PACK_ID);
+        Pack defaultPack = repository.getPack(PinnedWorldPackSource.DEFAULT_PACK_ID);
+        Pack playerPack = repository.getPack(PinnedWorldPackSource.PLAYER_PACK_ID);
+        boolean defaultAvailable = defaultPack != null;
+        boolean playerAvailable = playerPack != null;
+
+        List<String> ordered = new ArrayList<>(selectedBefore.size() + 2);
+        for (String id : selectedBefore) {
+            if (!id.equals(PinnedWorldPackSource.DEFAULT_PACK_ID)
+                    && !id.equals(PinnedWorldPackSource.PLAYER_PACK_ID)) {
+                ordered.add(id);
+            }
+        }
+        if (defaultAvailable) {
+            ordered.add(0, PinnedWorldPackSource.DEFAULT_PACK_ID);
+        }
+        if (playerAvailable) {
+            ordered.add(PinnedWorldPackSource.PLAYER_PACK_ID);
+        }
+
+        VisualCreativeTabEditorConstants.LOGGER.info(
+                "[EditorTrace] creative-tab-reload-selection selectedBefore={} selectedAfter={} "
+                        + "defaultAvailable={} defaultRequired={} defaultSelectedBefore={} "
+                        + "playerAvailable={} playerRequired={} playerSelectedBefore={}",
+                selectedBefore.size(),
+                ordered.size(),
+                defaultAvailable,
+                defaultPack != null && defaultPack.isRequired(),
+                defaultSelectedBefore,
+                playerAvailable,
+                playerPack != null && playerPack.isRequired(),
+                playerSelectedBefore
+        );
+        return List.copyOf(ordered);
     }
 
     public static Path playerPackRoot() {
