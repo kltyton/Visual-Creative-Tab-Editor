@@ -84,7 +84,7 @@ mods, are appended automatically.
 ## Limits and failure behavior
 
 - 512 tabs per resolved catalog.
-- 4096 stacks in `items` and 4096 stacks in `search_items` per tab, with 65536
+- 16384 stacks in `items` and 16384 stacks in `search_items` per tab, with 65536
   configured stacks total across the catalog.
 - Unknown fields, invalid identifiers, empty stacks, invalid components, and
   unsupported schema versions fail the resource reload.

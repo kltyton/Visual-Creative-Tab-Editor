@@ -425,12 +425,16 @@ public final class CreativeTabServerManager {
                         true,
                         target.registryAccess()
                 );
-                registryTabs.stream()
-                        .filter(tab -> tab.getType() == CreativeModeTab.Type.CATEGORY)
-                        .forEach(tab -> tab.buildContents(parameters));
-                registryTabs.stream()
-                        .filter(tab -> tab.getType() != CreativeModeTab.Type.CATEGORY)
-                        .forEach(tab -> tab.buildContents(parameters));
+                for (CreativeModeTab tab : registryTabs) {
+                    if (tab.getType() == CreativeModeTab.Type.CATEGORY) {
+                        rebuildNativeContents(tab, parameters, originalContents.get(tab));
+                    }
+                }
+                for (CreativeModeTab tab : registryTabs) {
+                    if (tab.getType() != CreativeModeTab.Type.CATEGORY) {
+                        rebuildNativeContents(tab, parameters, originalContents.get(tab));
+                    }
+                }
                 List<CreativeTabDefinition> definitions = new ArrayList<>();
                 int order = 0;
                 List<CreativeModeTab> nativeOrder = CreativeTabNativeOrder.apply(registryTabs);
@@ -460,14 +464,37 @@ public final class CreativeTabServerManager {
                 }
                 return new CreativeTabCatalog(definitions);
             } finally {
-                originalContents.forEach((tab, contents) -> {
-                    tab.getDisplayItems().clear();
-                    tab.getDisplayItems().addAll(contents.displayItems());
-                    tab.getSearchTabDisplayItems().clear();
-                    tab.getSearchTabDisplayItems().addAll(contents.searchItems());
-                });
+                originalContents.forEach(CreativeTabServerManager::restoreNativeContents);
             }
         });
+    }
+
+    private static void rebuildNativeContents(
+            CreativeModeTab tab,
+            CreativeModeTab.ItemDisplayParameters parameters,
+            NativeContents fallback
+    ) {
+        try {
+            tab.buildContents(parameters);
+        } catch (RuntimeException | LinkageError exception) {
+            restoreNativeContents(tab, fallback);
+            Identifier id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+            VisualCreativeTabEditorConstants.LOGGER.warn(
+                    "Could not rebuild native creative tab id={} type={}; preserving {} display and {} search items",
+                    id == null ? "<unregistered>" : id,
+                    tab.getType(),
+                    fallback.displayItems().size(),
+                    fallback.searchItems().size(),
+                    exception
+            );
+        }
+    }
+
+    private static void restoreNativeContents(CreativeModeTab tab, NativeContents contents) {
+        tab.getDisplayItems().clear();
+        tab.getDisplayItems().addAll(contents.displayItems());
+        tab.getSearchTabDisplayItems().clear();
+        tab.getSearchTabDisplayItems().addAll(contents.searchItems());
     }
 
     private static Map<Path, String> fullDocuments(CreativeTabCatalog catalog, HolderLookup.Provider lookup) {
