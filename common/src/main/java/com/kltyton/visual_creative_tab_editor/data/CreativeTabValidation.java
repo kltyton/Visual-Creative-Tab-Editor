@@ -55,7 +55,8 @@ public final class CreativeTabValidation {
                                 + requiredType.serializedName() + ", got " + definition.type().serializedName()
                 );
             }
-            totalItems += (long) definition.items().size() + definition.searchItems().size();
+            // Definitions validate their private defensive copies during construction.
+            totalItems += (long) definition.itemCount() + definition.searchItemCount();
             if (totalItems > MAX_TOTAL_ITEMS) {
                 throw new IllegalArgumentException("Too many creative tab items: " + totalItems + " > " + MAX_TOTAL_ITEMS);
             }

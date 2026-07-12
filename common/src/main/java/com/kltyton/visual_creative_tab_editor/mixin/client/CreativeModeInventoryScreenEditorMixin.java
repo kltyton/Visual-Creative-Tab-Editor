@@ -302,16 +302,6 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         return visible;
     }
 
-    @Inject(method = "getTooltipFromContainerItem", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$suppressItemTooltip(
-            ItemStack stack,
-            CallbackInfoReturnable<List<Component>> callback
-    ) {
-        if (this.visualCreativeTabEditor$editor().suppressesTooltips()) {
-            callback.setReturnValue(List.of());
-        }
-    }
-
     @Inject(method = "checkTabHovering", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$suppressTabTooltip(
             GuiGraphics graphics,
@@ -356,6 +346,11 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     @Override
     public CreativeModeInventoryScreen visualCreativeTabEditor$screen() {
         return (CreativeModeInventoryScreen) (Object) this;
+    }
+
+    @Override
+    public boolean visualCreativeTabEditor$suppressesTooltips() {
+        return this.visualCreativeTabEditor$editor().suppressesItemTooltip(this.hoveredSlot);
     }
 
     @Override

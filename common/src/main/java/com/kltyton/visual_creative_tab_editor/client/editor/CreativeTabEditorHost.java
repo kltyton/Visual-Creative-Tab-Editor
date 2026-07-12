@@ -12,6 +12,8 @@ import net.minecraft.world.item.CreativeModeTab;
 public interface CreativeTabEditorHost {
     CreativeModeInventoryScreen visualCreativeTabEditor$screen();
 
+    boolean visualCreativeTabEditor$suppressesTooltips();
+
     Minecraft visualCreativeTabEditor$minecraft();
 
     Font visualCreativeTabEditor$font();

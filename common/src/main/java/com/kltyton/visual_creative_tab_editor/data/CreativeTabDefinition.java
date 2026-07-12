@@ -6,6 +6,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -118,9 +119,72 @@ public record CreativeTabDefinition(
         return copyStacks(items);
     }
 
+    /** Returns the parent-tab item count without materializing defensive copies. */
+    public int itemCount() {
+        return items.size();
+    }
+
+    /** Returns one defensive parent-tab stack copy. */
+    public ItemStack itemAt(int index) {
+        return items.get(index).copy();
+    }
+
+    /** Compares one parent-tab stack without exposing or copying the stored stack. */
+    public boolean itemMatches(int index, ItemStack other) {
+        return ItemStack.isSameItemSameComponents(items.get(index), Objects.requireNonNull(other, "other"));
+    }
+
+    /** Appends defensive count-one copies without allocating an intermediate list. */
+    public void copyItemsTo(Collection<ItemStack> destination) {
+        Objects.requireNonNull(destination, "destination");
+        for (ItemStack stack : items) {
+            destination.add(stack.copyWithCount(1));
+        }
+    }
+
     @Override
     public List<ItemStack> searchItems() {
         return copyStacks(searchItems);
+    }
+
+    /** Returns the search-contribution count without materializing defensive copies. */
+    public int searchItemCount() {
+        return searchItems.size();
+    }
+
+    /** Returns one defensive search-contribution stack copy. */
+    public ItemStack searchItemAt(int index) {
+        return searchItems.get(index).copy();
+    }
+
+    /** Appends defensive count-one search copies without allocating an intermediate list. */
+    public void copySearchItemsTo(Collection<ItemStack> destination) {
+        Objects.requireNonNull(destination, "destination");
+        for (ItemStack stack : searchItems) {
+            destination.add(stack.copyWithCount(1));
+        }
+    }
+
+    /** Compares parent-tab item order without creating defensive snapshots. */
+    public boolean hasSameItems(CreativeTabDefinition other) {
+        return sameStacks(items, Objects.requireNonNull(other, "other").items);
+    }
+
+    /** Compares search contribution order without creating defensive snapshots. */
+    public boolean hasSameSearchItems(CreativeTabDefinition other) {
+        return sameStacks(searchItems, Objects.requireNonNull(other, "other").searchItems);
+    }
+
+    private static boolean sameStacks(List<ItemStack> left, List<ItemStack> right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int index = 0; index < left.size(); index++) {
+            if (!ItemStack.isSameItemSameComponents(left.get(index), right.get(index))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static List<ItemStack> copyStacks(List<ItemStack> stacks) {

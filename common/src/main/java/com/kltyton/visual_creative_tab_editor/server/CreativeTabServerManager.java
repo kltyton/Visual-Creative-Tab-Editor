@@ -58,27 +58,51 @@ public final class CreativeTabServerManager {
     private static final int GAMEMASTER_PERMISSION_LEVEL = 2;
     private static final Gson PRETTY_GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private static final AtomicLong REVISION = new AtomicLong();
+    private static final AtomicLong PACK_MUTATION_EPOCH = new AtomicLong();
     private static final Map<UUID, PendingEdit> PENDING_EDITS = new HashMap<>();
-    private static final Map<UUID, Boolean> EDIT_PERMISSION_STATE = new HashMap<>();
+    private static final Map<UUID, EditResultPayload> PENDING_RESULTS = new HashMap<>();
+    private static final Map<UUID, SyncState> SYNC_STATE = new HashMap<>();
     private static volatile MinecraftServer server;
     private static volatile HolderLookup.Provider registries;
     private static volatile CreativeTabCatalog base = CreativeTabCatalog.EMPTY;
     private static volatile CreativeTabCatalog resolved = CreativeTabCatalog.EMPTY;
     private static volatile boolean defaultPresent;
+    private static volatile SnapshotCache snapshotCache;
     private static boolean commitInProgress;
+    private static boolean reloadRetryScheduled;
     private static int permissionCheckTicks;
 
     private CreativeTabServerManager() {
     }
 
     public static synchronized void acceptReload(CreativeTabReloadListener.Prepared prepared) {
+        long currentMutationEpoch = PACK_MUTATION_EPOCH.get();
+        if (prepared.sourceRevision() != REVISION.get()
+                || prepared.sourceMutationEpoch() != currentMutationEpoch
+                || (currentMutationEpoch & 1L) != 0L) {
+            VisualCreativeTabEditorConstants.LOGGER.info(
+                    "Discarding stale creative-tab reload prepared at revision {}/mutation {}; current state is {}/{}",
+                    prepared.sourceRevision(),
+                    prepared.sourceMutationEpoch(),
+                    REVISION.get(),
+                    currentMutationEpoch
+            );
+            scheduleReloadRetry();
+            return;
+        }
         registries = prepared.registries();
         base = prepared.base();
         resolved = prepared.resolved();
         defaultPresent = prepared.defaultPresent();
+        long revision = REVISION.get();
         if (defaultPresent) {
-            REVISION.incrementAndGet();
+            revision = REVISION.incrementAndGet();
         }
+        snapshotCache = new SnapshotCache(
+                revision,
+                prepared.snapshot().uncompressedSize(),
+                prepared.snapshot().chunks()
+        );
     }
 
     public static void onServerStarted(MinecraftServer startedServer) {
@@ -104,15 +128,22 @@ public final class CreativeTabServerManager {
             base = CreativeTabCatalog.EMPTY;
             resolved = CreativeTabCatalog.EMPTY;
             defaultPresent = false;
+            snapshotCache = null;
             PENDING_EDITS.clear();
-            EDIT_PERMISSION_STATE.clear();
+            PENDING_RESULTS.clear();
+            SYNC_STATE.clear();
             commitInProgress = false;
+            reloadRetryScheduled = false;
             permissionCheckTicks = 0;
         }
     }
 
     public static long revision() {
         return REVISION.get();
+    }
+
+    static long packMutationEpoch() {
+        return PACK_MUTATION_EPOCH.get();
     }
 
     public static CreativeTabCatalog baseCatalog() {
@@ -136,22 +167,9 @@ public final class CreativeTabServerManager {
             return;
         }
         try {
-            byte[] bytes = encodeSnapshotBundle(base, resolved, registries());
-            List<byte[]> chunks = PayloadChunks.compressAndSplit(bytes);
-            boolean canEdit = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
-            long revision = REVISION.get();
-            for (int index = 0; index < chunks.size(); index++) {
-                CreativeTabNetworkBridge.sendToPlayer(player, new SnapshotChunkPayload(
-                        revision,
-                        canEdit,
-                        index,
-                        chunks.size(),
-                        bytes.length,
-                        chunks.get(index)
-                ));
-            }
-            EDIT_PERMISSION_STATE.put(player.getUUID(), canEdit);
+            sendSnapshot(player, currentSnapshot());
         } catch (RuntimeException exception) {
+            SYNC_STATE.remove(player.getUUID());
             VisualCreativeTabEditorConstants.LOGGER.error("Failed to encode creative-tab snapshot for {}", player.getScoreboardName(), exception);
         }
     }
@@ -208,37 +226,56 @@ public final class CreativeTabServerManager {
             HolderLookup.Provider previousRegistries = registries;
             boolean previousDefaultPresent = defaultPresent;
             long previousRevision = REVISION.get();
+            SnapshotCache previousSnapshotCache = snapshotCache;
+            PACK_MUTATION_EPOCH.incrementAndGet();
             try {
-                boolean changed = writePlayerOverrides(target);
-                if (changed) {
-                    MinecraftServer current = server;
-                    if (current == null) {
-                        throw new IllegalStateException("Server stopped during creative-tab edit");
-                    }
-                    reloadWorldPacks(current).join();
-                }
-            } catch (Exception saveFailure) {
-                base = previousBase;
-                resolved = previousResolved;
-                registries = previousRegistries;
-                defaultPresent = previousDefaultPresent;
-                REVISION.set(previousRevision);
                 try {
-                    restoreOwnedPack(playerRoot, backup);
-                } catch (Exception restoreFailure) {
-                    saveFailure.addSuppressed(restoreFailure);
-                }
-                MinecraftServer current = server;
-                if (current != null) {
-                    try {
-                        current.getPackRepository().reload();
-                    } catch (RuntimeException repositoryFailure) {
-                        saveFailure.addSuppressed(repositoryFailure);
+                    boolean changed = writePlayerOverrides(target);
+                    if (changed) {
+                        MinecraftServer current = server;
+                        if (current == null) {
+                            throw new IllegalStateException("Server stopped during creative-tab edit");
+                        }
+                        ensurePlayerPackDiscovered(current);
+                        long nextRevision = previousRevision + 1L;
+                        SnapshotCache nextSnapshot = buildSnapshot(nextRevision, base, target, registries());
+                        resolved = target;
+                        REVISION.set(nextRevision);
+                        snapshotCache = nextSnapshot;
+                        syncToAll(current, nextSnapshot);
+                        VisualCreativeTabEditorConstants.LOGGER.info(
+                                "Saved creative-tab overrides without reloading every data pack: tabs={}, revision={}, snapshotChunks={}",
+                                target.orderedDefinitions().size(),
+                                nextRevision,
+                                nextSnapshot.chunks().size()
+                        );
                     }
+                } catch (Exception saveFailure) {
+                    base = previousBase;
+                    resolved = previousResolved;
+                    registries = previousRegistries;
+                    defaultPresent = previousDefaultPresent;
+                    REVISION.set(previousRevision);
+                    snapshotCache = previousSnapshotCache;
+                    try {
+                        restoreOwnedPack(playerRoot, backup);
+                    } catch (Exception restoreFailure) {
+                        saveFailure.addSuppressed(restoreFailure);
+                    }
+                    MinecraftServer current = server;
+                    if (current != null) {
+                        try {
+                            current.getPackRepository().reload();
+                        } catch (RuntimeException repositoryFailure) {
+                            saveFailure.addSuppressed(repositoryFailure);
+                        }
+                    }
+                    throw saveFailure;
                 }
-                throw saveFailure;
+            } finally {
+                PACK_MUTATION_EPOCH.incrementAndGet();
             }
-            CreativeTabNetworkBridge.sendToPlayer(player, new EditResultPayload(
+            sendEditResult(player, new EditResultPayload(
                     pending.sessionId,
                     true,
                     REVISION.get(),
@@ -259,19 +296,35 @@ public final class CreativeTabServerManager {
 
     public static void onPlayerDisconnected(ServerPlayer player) {
         PENDING_EDITS.remove(player.getUUID());
-        EDIT_PERMISSION_STATE.remove(player.getUUID());
+        PENDING_RESULTS.remove(player.getUUID());
+        SYNC_STATE.remove(player.getUUID());
     }
 
     public static void refreshEditPermissions(MinecraftServer target) {
-        if (server != target || !defaultPresent || ++permissionCheckTicks < 20) {
+        if (server != target) {
+            return;
+        }
+        if (reloadRetryScheduled) {
+            reloadRetryScheduled = false;
+            try {
+                reloadWorldPacks(target);
+            } catch (RuntimeException exception) {
+                VisualCreativeTabEditorConstants.LOGGER.error("Failed to retry a stale creative-tab reload", exception);
+            }
+        }
+        if (!defaultPresent || ++permissionCheckTicks < 20) {
             return;
         }
         permissionCheckTicks = 0;
         for (ServerPlayer player : target.getPlayerList().getPlayers()) {
             boolean current = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
-            Boolean previous = EDIT_PERMISSION_STATE.get(player.getUUID());
-            if (previous == null || previous != current) {
+            SyncState previous = SYNC_STATE.get(player.getUUID());
+            if (previous == null || previous.revision() != REVISION.get() || previous.canEdit() != current) {
                 syncTo(player);
+            }
+            EditResultPayload pendingResult = PENDING_RESULTS.get(player.getUUID());
+            if (pendingResult != null) {
+                sendEditResult(player, pendingResult);
             }
         }
     }
@@ -289,6 +342,90 @@ public final class CreativeTabServerManager {
                 com.kltyton.visual_creative_tab_editor.data.CreativeTabCatalogJson.encode(resolvedCatalog, lookup)
         ));
         return bundle.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static SnapshotCache currentSnapshot() {
+        long revision = REVISION.get();
+        SnapshotCache cached = snapshotCache;
+        if (cached != null && cached.revision() == revision) {
+            return cached;
+        }
+        synchronized (CreativeTabServerManager.class) {
+            cached = snapshotCache;
+            if (cached == null || cached.revision() != revision) {
+                cached = buildSnapshot(revision, base, resolved, registries());
+                snapshotCache = cached;
+            }
+            return cached;
+        }
+    }
+
+    private static SnapshotCache buildSnapshot(
+            long revision,
+            CreativeTabCatalog baseCatalog,
+            CreativeTabCatalog resolvedCatalog,
+            HolderLookup.Provider lookup
+    ) {
+        PreparedSnapshot prepared = prepareSnapshot(baseCatalog, resolvedCatalog, lookup);
+        return new SnapshotCache(revision, prepared.uncompressedSize(), prepared.chunks());
+    }
+
+    static PreparedSnapshot prepareSnapshot(
+            CreativeTabCatalog baseCatalog,
+            CreativeTabCatalog resolvedCatalog,
+            HolderLookup.Provider lookup
+    ) {
+        byte[] bytes = encodeSnapshotBundle(baseCatalog, resolvedCatalog, lookup);
+        return new PreparedSnapshot(bytes.length, PayloadChunks.compressAndSplit(bytes));
+    }
+
+    private static void syncToAll(MinecraftServer target, SnapshotCache snapshot) {
+        for (ServerPlayer player : target.getPlayerList().getPlayers()) {
+            try {
+                sendSnapshot(player, snapshot);
+            } catch (RuntimeException exception) {
+                VisualCreativeTabEditorConstants.LOGGER.error(
+                        "Failed to send creative-tab snapshot to {}",
+                        player.getScoreboardName(),
+                        exception
+                );
+            }
+        }
+    }
+
+    private static void ensurePlayerPackDiscovered(MinecraftServer target) {
+        PackRepository repository = target.getPackRepository();
+        boolean selected = repository.getSelectedPacks().stream()
+                .anyMatch(pack -> pack.getId().equals(PinnedWorldPackSource.PLAYER_PACK_ID));
+        if (!selected) {
+            repository.reload();
+        }
+    }
+
+    private static void scheduleReloadRetry() {
+        if (server == null || reloadRetryScheduled) {
+            return;
+        }
+        reloadRetryScheduled = true;
+    }
+
+    private static boolean sendSnapshot(ServerPlayer player, SnapshotCache snapshot) {
+        boolean canEdit = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
+        for (int index = 0; index < snapshot.chunks().size(); index++) {
+            if (!CreativeTabNetworkBridge.sendToPlayer(player, new SnapshotChunkPayload(
+                    snapshot.revision(),
+                    canEdit,
+                    index,
+                    snapshot.chunks().size(),
+                    snapshot.uncompressedSize(),
+                    snapshot.chunks().get(index)
+            ))) {
+                SYNC_STATE.remove(player.getUUID());
+                return false;
+            }
+        }
+        SYNC_STATE.put(player.getUUID(), new SyncState(snapshot.revision(), canEdit));
+        return true;
     }
 
     private static void validateEditableTarget(CreativeTabCatalog target) {
@@ -310,13 +447,34 @@ public final class CreativeTabServerManager {
     }
 
     private static void reject(ServerPlayer player, UUID sessionId, String translationKey) {
-        CreativeTabNetworkBridge.sendToPlayer(player, new EditResultPayload(
+        sendEditResult(player, new EditResultPayload(
                 sessionId,
                 false,
                 REVISION.get(),
                 player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL),
                 net.minecraft.network.chat.Component.translatable(translationKey)
         ));
+    }
+
+    private static void sendEditResult(ServerPlayer player, EditResultPayload payload) {
+        boolean canEdit = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
+        EditResultPayload currentPayload = new EditResultPayload(
+                payload.sessionId(),
+                payload.success(),
+                REVISION.get(),
+                canEdit,
+                payload.message()
+        );
+        SyncState state = SYNC_STATE.get(player.getUUID());
+        if (state == null || state.revision() != REVISION.get() || state.canEdit() != canEdit) {
+            PENDING_RESULTS.put(player.getUUID(), currentPayload);
+            return;
+        }
+        if (CreativeTabNetworkBridge.sendToPlayer(player, currentPayload)) {
+            PENDING_RESULTS.remove(player.getUUID());
+        } else {
+            PENDING_RESULTS.put(player.getUUID(), currentPayload);
+        }
     }
 
     public static CompletableFuture<Void> reloadWorldPacks(MinecraftServer target) {
@@ -659,5 +817,14 @@ public final class CreativeTabServerManager {
     }
 
     private record NativeContents(Collection<ItemStack> displayItems, Set<ItemStack> searchItems) {
+    }
+
+    private record SnapshotCache(long revision, int uncompressedSize, List<byte[]> chunks) {
+    }
+
+    private record SyncState(long revision, boolean canEdit) {
+    }
+
+    public record PreparedSnapshot(int uncompressedSize, List<byte[]> chunks) {
     }
 }
