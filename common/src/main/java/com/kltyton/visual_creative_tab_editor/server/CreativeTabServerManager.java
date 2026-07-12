@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,6 +50,7 @@ import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackLinkedSet;
 import net.minecraft.world.level.storage.LevelResource;
 
 /** Owns world-pack generation and the server-authoritative resolved catalog. */
@@ -422,12 +424,16 @@ public final class CreativeTabServerManager {
                         true,
                         target.registryAccess()
                 );
-                registryTabs.stream()
-                        .filter(tab -> tab.getType() == CreativeModeTab.Type.CATEGORY)
-                        .forEach(tab -> tab.buildContents(parameters));
-                registryTabs.stream()
-                        .filter(tab -> tab.getType() != CreativeModeTab.Type.CATEGORY)
-                        .forEach(tab -> tab.buildContents(parameters));
+                for (CreativeModeTab tab : registryTabs) {
+                    if (tab.getType() == CreativeModeTab.Type.CATEGORY) {
+                        rebuildNativeContents(tab, parameters, originalContents.get(tab));
+                    }
+                }
+                for (CreativeModeTab tab : registryTabs) {
+                    if (tab.getType() != CreativeModeTab.Type.CATEGORY) {
+                        rebuildNativeContents(tab, parameters, originalContents.get(tab));
+                    }
+                }
                 List<CreativeTabDefinition> definitions = new ArrayList<>();
                 int order = 0;
                 List<CreativeModeTab> nativeOrder = CreativeTabNativeOrder.apply(registryTabs);
@@ -471,14 +477,37 @@ public final class CreativeTabServerManager {
                 }
                 return new CreativeTabCatalog(definitions);
             } finally {
-                originalContents.forEach((tab, contents) -> {
-                    tab.getDisplayItems().clear();
-                    tab.getDisplayItems().addAll(contents.displayItems());
-                    tab.getSearchTabDisplayItems().clear();
-                    tab.getSearchTabDisplayItems().addAll(contents.searchItems());
-                });
+                originalContents.forEach(CreativeTabServerManager::restoreNativeContents);
             }
         });
+    }
+
+    private static void rebuildNativeContents(
+            CreativeModeTab tab,
+            CreativeModeTab.ItemDisplayParameters parameters,
+            NativeContents fallback
+    ) {
+        try {
+            tab.buildContents(parameters);
+        } catch (RuntimeException | LinkageError exception) {
+            restoreNativeContents(tab, fallback);
+            ResourceLocation id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+            VisualCreativeTabEditorConstants.LOGGER.warn(
+                    "Could not rebuild native creative tab id={} type={}; preserving {} display and {} search items",
+                    id == null ? "<unregistered>" : id,
+                    tab.getType(),
+                    fallback.displayItems().size(),
+                    fallback.searchItems().size(),
+                    exception
+            );
+        }
+    }
+
+    private static void restoreNativeContents(CreativeModeTab tab, NativeContents contents) {
+        tab.getDisplayItems().clear();
+        tab.getDisplayItems().addAll(contents.displayItems());
+        tab.getSearchTabDisplayItems().clear();
+        tab.getSearchTabDisplayItems().addAll(contents.searchItems());
     }
 
     private static Map<Path, String> fullDocuments(CreativeTabCatalog catalog, HolderLookup.Provider lookup) {
@@ -644,12 +673,9 @@ public final class CreativeTabServerManager {
     }
 
     private static List<ItemStack> copyDistinct(Collection<ItemStack> source) {
-        List<ItemStack> result = new ArrayList<>(source.size());
+        Set<ItemStack> result = ItemStackLinkedSet.createTypeAndTagSet();
         for (ItemStack stack : source) {
-            ItemStack copy = stack.copyWithCount(1);
-            if (result.stream().noneMatch(candidate -> ItemStack.isSameItemSameTags(candidate, copy))) {
-                result.add(copy);
-            }
+            result.add(stack.copyWithCount(1));
         }
         return List.copyOf(result);
     }
