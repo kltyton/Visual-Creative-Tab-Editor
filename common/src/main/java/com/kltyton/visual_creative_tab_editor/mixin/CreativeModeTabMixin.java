@@ -133,13 +133,8 @@ public abstract class CreativeModeTabMixin {
         if (isOperatorUtilities() && !parameters.hasPermissions()) {
             return;
         }
-        for (ItemStack stack : definition.items()) {
-            ItemStack copy = stack.copyWithCount(1);
-            this.displayItems.add(copy);
-        }
-        for (ItemStack stack : definition.searchItems()) {
-            this.displayItemsSearchTab.add(stack.copyWithCount(1));
-        }
+        definition.copyItemsTo(this.displayItems);
+        definition.copySearchItemsTo(this.displayItemsSearchTab);
     }
 
     private boolean isOperatorUtilities() {

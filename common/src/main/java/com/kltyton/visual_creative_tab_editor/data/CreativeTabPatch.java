@@ -112,8 +112,8 @@ public record CreativeTabPatch(
                 target.format(),
                 changed(base.title(), target.title()) ? Optional.of(target.title()) : Optional.empty(),
                 ItemStack.matches(base.icon(), target.icon()) ? Optional.empty() : Optional.of(target.icon()),
-                stackListsMatch(base.items(), target.items()) ? Optional.empty() : Optional.of(target.items()),
-                stackListsMatch(base.searchItems(), target.searchItems())
+                base.hasSameItems(target) ? Optional.empty() : Optional.of(target.items()),
+                base.hasSameSearchItems(target)
                         ? Optional.empty()
                         : Optional.of(target.searchItems()),
                 changed(base.hidden(), target.hidden()),
@@ -228,18 +228,6 @@ public record CreativeTabPatch(
             copies.add(Objects.requireNonNull(stack, "stack").copy());
         }
         return List.copyOf(copies);
-    }
-
-    private static boolean stackListsMatch(List<ItemStack> first, List<ItemStack> second) {
-        if (first.size() != second.size()) {
-            return false;
-        }
-        for (int index = 0; index < first.size(); index++) {
-            if (!ItemStack.matches(first.get(index), second.get(index))) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static <T> Optional<T> requireOptional(Optional<T> value, String name) {
