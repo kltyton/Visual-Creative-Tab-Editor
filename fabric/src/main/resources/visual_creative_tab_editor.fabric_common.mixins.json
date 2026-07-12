@@ -12,6 +12,8 @@
     "ServerPacksSourceMixin"
   ],
   "client": [
+    "client.ScreenEditorOverlayMixin",
+    "client.AbstractContainerScreenTooltipMixin",
     "client.CreativeModeInventoryScreenEditorMixin",
     "client.CreativeModeItemPickerMenuVirtualTailMixin"
   ],
