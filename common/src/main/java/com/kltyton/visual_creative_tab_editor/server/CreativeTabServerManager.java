@@ -53,6 +53,7 @@ import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackLinkedSet;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.storage.LevelResource;
 
 /** Owns world-pack generation and the server-authoritative resolved catalog. */
@@ -601,30 +602,80 @@ public final class CreativeTabServerManager {
                     if (id == null) {
                         continue;
                     }
-                    List<ItemStack> items = tab.getType() == CreativeModeTab.Type.CATEGORY
-                            ? tab.getDisplayItems().stream().map(stack -> stack.copyWithCount(1)).toList()
-                            : List.of();
-                    List<ItemStack> searchItems = tab.getType() == CreativeModeTab.Type.CATEGORY
-                            ? tab.getSearchTabDisplayItems().stream().map(stack -> stack.copyWithCount(1)).toList()
-                            : List.of();
-                    definitions.add(new CreativeTabDefinition(
-                            id,
-                            CreativeTabPatch.CURRENT_FORMAT,
-                            tab.getDisplayName(),
-                            tab.getIconItem().copyWithCount(1),
-                            items,
-                            searchItems,
-                            !tab.shouldDisplay(),
-                            order++,
-                            CreativeTabType.fromVanilla(tab.getType()),
-                            new CreativeTabLayout(tab.canScroll(), tab.showTitle(), tab.isAlignedRight(), tab.getBackgroundTexture())
-                    ));
+                    int tabOrder = order++;
+                    try {
+                        List<ItemStack> items = tab.getType() == CreativeModeTab.Type.CATEGORY
+                                ? copyNativeStacks(tab.getDisplayItems())
+                                : List.of();
+                        List<ItemStack> searchItems = tab.getType() == CreativeModeTab.Type.CATEGORY
+                                ? copyNativeStacks(tab.getSearchTabDisplayItems())
+                                : List.of();
+                        definitions.add(new CreativeTabDefinition(
+                                id,
+                                CreativeTabPatch.CURRENT_FORMAT,
+                                tab.getDisplayName(),
+                                captureNativeIcon(id, tab, items, searchItems),
+                                items,
+                                searchItems,
+                                !tab.shouldDisplay(),
+                                tabOrder,
+                                CreativeTabType.fromVanilla(tab.getType()),
+                                new CreativeTabLayout(tab.canScroll(), tab.showTitle(), tab.isAlignedRight(), tab.getBackgroundTexture())
+                        ));
+                    } catch (RuntimeException | LinkageError exception) {
+                        VisualCreativeTabEditorConstants.LOGGER.warn(
+                                "Skipping incompatible native creative tab {} while generating the default data pack",
+                                id,
+                                exception
+                        );
+                    }
                 }
                 return new CreativeTabCatalog(definitions);
             } finally {
                 originalContents.forEach(CreativeTabServerManager::restoreNativeContents);
             }
         });
+    }
+
+    private static List<ItemStack> copyNativeStacks(Collection<ItemStack> stacks) {
+        List<ItemStack> result = new ArrayList<>(stacks.size());
+        for (ItemStack stack : stacks) {
+            if (stack != null && !stack.isEmpty()) {
+                result.add(stack.copyWithCount(1));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static ItemStack captureNativeIcon(
+            Identifier id,
+            CreativeModeTab tab,
+            List<ItemStack> items,
+            List<ItemStack> searchItems
+    ) {
+        ItemStack icon;
+        try {
+            icon = tab.getIconItem();
+        } catch (RuntimeException | LinkageError exception) {
+            VisualCreativeTabEditorConstants.LOGGER.warn(
+                    "Native creative tab {} failed to supply an icon; selecting a data-driven fallback",
+                    id,
+                    exception
+            );
+            icon = ItemStack.EMPTY;
+        }
+        if (icon != null && !icon.isEmpty()) {
+            return icon.copyWithCount(1);
+        }
+        ItemStack fallback = !items.isEmpty()
+                ? items.get(0)
+                : !searchItems.isEmpty() ? searchItems.get(0) : new ItemStack(Items.BARRIER);
+        VisualCreativeTabEditorConstants.LOGGER.warn(
+                "Native creative tab {} supplied an empty icon; using {} as its data-driven fallback",
+                id,
+                BuiltInRegistries.ITEM.getKey(fallback.getItem())
+        );
+        return fallback.copyWithCount(1);
     }
 
     private static void rebuildNativeContents(

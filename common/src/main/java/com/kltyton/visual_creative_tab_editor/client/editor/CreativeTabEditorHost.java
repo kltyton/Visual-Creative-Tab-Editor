@@ -19,6 +19,13 @@ public interface CreativeTabEditorHost {
 
     boolean visualCreativeTabEditor$suppressesTooltips();
 
+    void visualCreativeTabEditor$renderEditorOverlay(
+            GuiGraphicsExtractor graphics,
+            int mouseX,
+            int mouseY,
+            float partialTick
+    );
+
     Minecraft visualCreativeTabEditor$minecraft();
 
     Font visualCreativeTabEditor$font();

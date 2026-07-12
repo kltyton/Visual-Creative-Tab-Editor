@@ -24,7 +24,7 @@ and native Fabric/NeoForge pagination integration.
 
 | 项目 / Component | 版本 / Version |
 | --- | --- |
-| Mod | `2.0.1` |
+| Mod | `2.0.1-hotfix1` |
 | Minecraft | `26.2` |
 | Java | `25+` |
 | Fabric | Loader `0.19.3+` + Fabric API；tested with `0.152.1+26.2` |
@@ -56,8 +56,8 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 构建产物：
 
 ```text
-fabric/build/libs/visual_creative_tab_editor-fabric-26.2-2.0.1.jar
-neoforge/build/libs/visual_creative_tab_editor-neoforge-26.2-2.0.1.jar
+fabric/build/libs/visual_creative_tab_editor-fabric-26.2-2.0.1-hotfix1.jar
+neoforge/build/libs/visual_creative_tab_editor-neoforge-26.2-2.0.1-hotfix1.jar
 ```
 
 Minecraft 26.2 使用 Java 25。Gradle toolchain resolver 可以在需要时提供配置的 JDK。

@@ -10,7 +10,7 @@
 
 | 项目 | 当前支持 |
 | --- | --- |
-| Mod 版本 | `2.0.1` |
+| Mod 版本 | `2.0.1-hotfix1` |
 | Minecraft | `26.2` |
 | Fabric | Loader `0.19.3+`，需要 Fabric API；当前使用 `0.152.1+26.2` 构建和验证 |
 | NeoForge | `26.2.0.1-beta+` |

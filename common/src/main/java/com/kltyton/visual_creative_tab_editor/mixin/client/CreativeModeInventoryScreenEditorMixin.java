@@ -23,6 +23,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.PreeditEvent;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
@@ -60,6 +61,14 @@ public abstract class CreativeModeInventoryScreenEditorMixin
             this.visualCreativeTabEditor$editor = new CreativeTabEditorController(this);
         }
         return this.visualCreativeTabEditor$editor;
+    }
+
+    @Inject(method = "hasPermissions", at = @At("RETURN"))
+    private void visualCreativeTabEditor$rememberClientPermissions(
+            Player player,
+            CallbackInfoReturnable<Boolean> callback
+    ) {
+        CreativeTabRuntime.rememberClientPermissions(callback.getReturnValue());
     }
 
     @Inject(method = "init", at = @At("TAIL"))
@@ -134,13 +143,12 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         this.visualCreativeTabEditor$editor().afterMouseReleased(event);
     }
 
-    @Inject(method = "extractRenderState", at = @At("TAIL"))
-    private void visualCreativeTabEditor$extractEditor(
+    @Override
+    public void visualCreativeTabEditor$renderEditorOverlay(
             GuiGraphicsExtractor graphics,
             int mouseX,
             int mouseY,
-            float partialTick,
-            CallbackInfo callback
+            float partialTick
     ) {
         this.visualCreativeTabEditor$editor().extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
