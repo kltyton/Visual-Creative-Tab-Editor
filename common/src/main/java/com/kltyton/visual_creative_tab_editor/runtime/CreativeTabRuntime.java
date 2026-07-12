@@ -6,6 +6,7 @@ import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.IdentityHashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ public final class CreativeTabRuntime {
     private static final ThreadLocal<State> PREVIEW = new ThreadLocal<>();
     private static final ThreadLocal<Integer> NATIVE_BYPASS = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<CreativeModeTab> FORCED_VISIBLE_TAB = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> LAST_HAS_PERMISSIONS = new ThreadLocal<>();
 
     private CreativeTabRuntime() {
     }
@@ -38,12 +40,14 @@ public final class CreativeTabRuntime {
         Map<Identifier, CreativeModeTab> handoff = PREVIEW_HANDOFF.getAndSet(null);
         ACTIVE.updateAndGet(previous -> State.create(catalog, previous, handoff));
         CreativeModeTabs.CACHED_PARAMETERS = null;
+        refreshKnownContents();
     }
 
     public static void clear() {
         PREVIEW.remove();
         PREVIEW_HANDOFF.set(null);
         ACTIVE.set(State.empty());
+        LAST_HAS_PERMISSIONS.remove();
         CreativeModeTabs.CACHED_PARAMETERS = null;
     }
 
@@ -54,14 +58,16 @@ public final class CreativeTabRuntime {
 
     public static void setPreview(CreativeTabCatalog preview) {
         State previous = PREVIEW.get();
-        PREVIEW.set(State.create(Objects.requireNonNull(preview, "preview"), previous != null ? previous : ACTIVE.get()));
-        CreativeModeTabs.CACHED_PARAMETERS = null;
+        State baseline = previous != null ? previous : ACTIVE.get();
+        PREVIEW.set(State.create(Objects.requireNonNull(preview, "preview"), baseline));
+        refreshKnownContents(baseline);
     }
 
     public static void clearPreview() {
+        State previous = PREVIEW.get();
         PREVIEW.remove();
         PREVIEW_HANDOFF.set(null);
-        CreativeModeTabs.CACHED_PARAMETERS = null;
+        refreshKnownContents(previous);
     }
 
     /** Makes custom preview-tab identities available to the next server snapshot. */
@@ -173,7 +179,8 @@ public final class CreativeTabRuntime {
         });
         List<ItemStack> ordered = new ArrayList<>(aggregate.size());
         definition(search).ifPresent(definition -> {
-            for (ItemStack preferred : definition.items()) {
+            for (int index = 0; index < definition.itemCount(); index++) {
+                ItemStack preferred = definition.itemAt(index);
                 ItemStack present = aggregate.remove(StackKey.of(preferred));
                 if (present != null) {
                     ordered.add(present);
@@ -183,6 +190,118 @@ public final class CreativeTabRuntime {
         ordered.addAll(aggregate.values());
         display.addAll(ordered);
         searchable.addAll(ordered);
+    }
+
+    /**
+     * Projects the active catalog directly into vanilla tab collections.
+     * This deliberately bypasses {@link CreativeModeTab#buildContents} because
+     * performance mods may memoize that complete method and skip Mixin hooks.
+     */
+    public static void refreshContents(CreativeModeTab.ItemDisplayParameters parameters) {
+        Objects.requireNonNull(parameters, "parameters");
+        LAST_HAS_PERMISSIONS.set(parameters.hasPermissions());
+        applyCatalogContents(parameters.hasPermissions());
+        rebuildSearchContents();
+    }
+
+    private static void refreshKnownContents() {
+        refreshKnownContents(null);
+    }
+
+    private static void refreshKnownContents(State previous) {
+        Boolean hasPermissions = LAST_HAS_PERMISSIONS.get();
+        State current = currentState();
+        if (hasPermissions == null || isNativeBypass() || current.catalog.isEmpty()) {
+            return;
+        }
+        if (previous == null) {
+            applyCatalogContents(hasPermissions, null);
+            rebuildSearchContents();
+            return;
+        }
+
+        Set<Identifier> changedContents = new HashSet<>();
+        boolean searchChanged = false;
+        for (CreativeTabDefinition definition : current.catalog.orderedDefinitions()) {
+            CreativeTabDefinition before = previous.catalog.definitions().get(definition.id());
+            if (before == definition) {
+                continue;
+            }
+            if (definition.type() == CreativeTabType.CATEGORY
+                    && (before == null
+                    || before.type() != CreativeTabType.CATEGORY
+                    || !before.hasSameItems(definition)
+                    || !before.hasSameSearchItems(definition))) {
+                changedContents.add(definition.id());
+            }
+            searchChanged |= changesSearchProjection(before, definition);
+        }
+        for (CreativeTabDefinition definition : previous.catalog.orderedDefinitions()) {
+            if (!current.catalog.definitions().containsKey(definition.id())
+                    && (definition.type() == CreativeTabType.CATEGORY
+                    || definition.type() == CreativeTabType.SEARCH)) {
+                searchChanged = true;
+            }
+        }
+        if (!changedContents.isEmpty()) {
+            applyCatalogContents(hasPermissions, changedContents);
+        }
+        if (searchChanged) {
+            CreativeModeTabs.CACHED_PARAMETERS = null;
+            rebuildSearchContents();
+        }
+    }
+
+    private static void applyCatalogContents(boolean hasPermissions) {
+        applyCatalogContents(hasPermissions, null);
+    }
+
+    private static void applyCatalogContents(boolean hasPermissions, Set<Identifier> changedContents) {
+        effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream()).forEach(tab -> {
+            CreativeTabDefinition definition = definition(tab).orElse(null);
+            if (definition == null || definition.type() != CreativeTabType.CATEGORY) {
+                return;
+            }
+            if (changedContents != null && !changedContents.contains(definition.id())) {
+                return;
+            }
+            Collection<ItemStack> display = tab.getDisplayItems();
+            Collection<ItemStack> searchable = tab.getSearchTabDisplayItems();
+            display.clear();
+            searchable.clear();
+            if (id(tab).filter(id -> id.equals(Identifier.withDefaultNamespace("op_blocks"))).isPresent()
+                    && !hasPermissions) {
+                return;
+            }
+            definition.copyItemsTo(display);
+            definition.copySearchItemsTo(searchable);
+        });
+    }
+
+    private static boolean changesSearchProjection(
+            CreativeTabDefinition before,
+            CreativeTabDefinition after
+    ) {
+        if (before == null) {
+            return after.type() == CreativeTabType.CATEGORY || after.type() == CreativeTabType.SEARCH;
+        }
+        if (before.type() != after.type()) {
+            return before.type() == CreativeTabType.CATEGORY
+                    || before.type() == CreativeTabType.SEARCH
+                    || after.type() == CreativeTabType.CATEGORY
+                    || after.type() == CreativeTabType.SEARCH;
+        }
+        if (after.type() == CreativeTabType.CATEGORY) {
+            return before.hidden() != after.hidden()
+                    || before.order() != after.order()
+                    || !before.hasSameSearchItems(after);
+        }
+        return after.type() == CreativeTabType.SEARCH && !before.hasSameItems(after);
+    }
+
+    private static State currentState() {
+        State preview = PREVIEW.get();
+        return preview != null ? preview : ACTIVE.get();
     }
 
     private record State(

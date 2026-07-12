@@ -8,7 +8,6 @@ import com.kltyton.visual_creative_tab_editor.data.CreativeTabPatch;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabValidation;
 import com.kltyton.visual_creative_tab_editor.pack.PinnedWorldPackSource;
-import com.kltyton.visual_creative_tab_editor.network.PayloadChunks;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -35,6 +34,8 @@ public final class CreativeTabReloadListener extends SimplePreparableReloadListe
 
     @Override
     protected Prepared prepare(ResourceManager manager, ProfilerFiller profiler) {
+        long sourceRevision = CreativeTabServerManager.revision();
+        long sourceMutationEpoch = CreativeTabServerManager.packMutationEpoch();
         Map<Identifier, List<Layer>> resources = new LinkedHashMap<>();
         boolean defaultResourceSeen = false;
         boolean defaultResourcesValid = true;
@@ -49,11 +50,15 @@ public final class CreativeTabReloadListener extends SimplePreparableReloadListe
             VisualCreativeTabEditorConstants.LOGGER.info(
                     "Deferring creative-tab data until item prototype components are bound"
             );
+            CreativeTabCatalog empty = CreativeTabCatalog.EMPTY;
             return new Prepared(
-                    CreativeTabCatalog.EMPTY,
-                    CreativeTabCatalog.EMPTY,
+                    empty,
+                    empty,
                     false,
-                    this.registries
+                    this.registries,
+                    CreativeTabServerManager.prepareSnapshot(empty, empty, this.registries),
+                    sourceRevision,
+                    sourceMutationEpoch
             );
         }
 
@@ -155,11 +160,11 @@ public final class CreativeTabReloadListener extends SimplePreparableReloadListe
                 base,
                 resolved,
                 defaultResourceSeen && defaultResourcesValid,
-                this.registries
+                this.registries,
+                CreativeTabServerManager.prepareSnapshot(base, resolved, this.registries),
+                sourceRevision,
+                sourceMutationEpoch
         );
-        PayloadChunks.compress(CreativeTabServerManager.encodeSnapshotBundle(
-                prepared.base(), prepared.resolved(), prepared.registries()
-        ));
         return prepared;
     }
 
@@ -293,7 +298,7 @@ public final class CreativeTabReloadListener extends SimplePreparableReloadListe
     }
 
     private static long itemCount(CreativeTabDefinition definition) {
-        return (long) definition.items().size() + definition.searchItems().size();
+        return (long) definition.itemCount() + definition.searchItemCount();
     }
 
     private static CreativeTabCatalog buildBaseCatalog(Map<Identifier, ResolvedBase> definitions) {
@@ -346,7 +351,10 @@ public final class CreativeTabReloadListener extends SimplePreparableReloadListe
             CreativeTabCatalog base,
             CreativeTabCatalog resolved,
             boolean defaultPresent,
-            HolderLookup.Provider registries
+            HolderLookup.Provider registries,
+            CreativeTabServerManager.PreparedSnapshot snapshot,
+            long sourceRevision,
+            long sourceMutationEpoch
     ) {
     }
 }

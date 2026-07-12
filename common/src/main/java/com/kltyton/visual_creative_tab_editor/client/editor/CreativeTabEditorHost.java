@@ -17,6 +17,8 @@ import org.jspecify.annotations.Nullable;
 public interface CreativeTabEditorHost {
     CreativeModeInventoryScreen visualCreativeTabEditor$screen();
 
+    boolean visualCreativeTabEditor$suppressesTooltips();
+
     Minecraft visualCreativeTabEditor$minecraft();
 
     Font visualCreativeTabEditor$font();

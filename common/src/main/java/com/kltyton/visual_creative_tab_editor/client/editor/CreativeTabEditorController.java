@@ -776,6 +776,13 @@ public final class CreativeTabEditorController {
         return isEditing();
     }
 
+    public boolean suppressesItemTooltip(@Nullable Slot hoveredSlot) {
+        return isEditing()
+                && (!isPicker()
+                || hoveredSlot == null
+                || this.host.visualCreativeTabEditor$isCreativeSlot(hoveredSlot));
+    }
+
     public boolean keyPressed(KeyEvent event) {
         if (this.mode != Mode.TAB_PROPERTIES) {
             if (isEditing() && event.isEscape()) {
@@ -861,7 +868,7 @@ public final class CreativeTabEditorController {
                     this.mode,
                     this.draftRevision,
                     this.draft.currentTabId().orElse(null),
-                    this.draft.tabs().size(),
+                    this.draft.tabCount(),
                     currentItemCount()
             );
         }
@@ -1003,7 +1010,7 @@ public final class CreativeTabEditorController {
                 editMode,
                 tabId(selected),
                 this.draftRevision,
-                this.draft.tabs().size()
+                this.draft.tabCount()
         );
         preview();
     }
@@ -1151,7 +1158,7 @@ public final class CreativeTabEditorController {
         Mode pickerMode = this.mode;
         ItemStack picked = stack.copyWithCount(1);
         Identifier createdTabId = null;
-        int tabsBefore = draft().tabs().size();
+        int tabsBefore = draft().tabCount();
         int itemsBefore = currentItemCount();
         int searchItemsBefore = currentSearchItemCount();
         int requestedIndex = this.contextItemIndex;
@@ -1188,7 +1195,7 @@ public final class CreativeTabEditorController {
                 stackId(previous),
                 existingPickedIndex,
                 tabsBefore,
-                draft().tabs().size(),
+                draft().tabCount(),
                 itemsBefore,
                 currentItemCount(),
                 searchItemsBefore,
@@ -1219,7 +1226,7 @@ public final class CreativeTabEditorController {
                 draft().currentTabId().orElse(null),
                 this.contextItemIndex,
                 stackId(currentItemAt(this.contextItemIndex)),
-                draft().tabs().size(),
+                draft().tabCount(),
                 currentItemCount(),
                 currentSearchItemCount(),
                 this.host.visualCreativeTabEditor$menu().items.size(),
@@ -1584,7 +1591,7 @@ public final class CreativeTabEditorController {
                 this.mode,
                 returnMode,
                 this.draftRevision,
-                this.draft.tabs().size(),
+                this.draft.tabCount(),
                 this.draft.currentTabId().orElse(null),
                 currentItemCount(),
                 currentSearchItemCount()
@@ -2307,7 +2314,7 @@ public final class CreativeTabEditorController {
         }
         Identifier id = CreativeTabRuntime.id(tab).orElse(null);
         if (id == null) {
-            return draft().tabs().size();
+            return draft().tabCount();
         }
         List<CreativeTabDefinition> tabs = draft().tabs();
         for (int index = 0; index < tabs.size(); index++) {
@@ -2547,7 +2554,7 @@ public final class CreativeTabEditorController {
                     reason,
                     selectedId,
                     this.draft.currentItemCount(),
-                    definition.items().size(),
+                    definition.itemCount(),
                     currentBefore
             );
             return;
@@ -2574,17 +2581,17 @@ public final class CreativeTabEditorController {
             if (after == null) {
                 continue;
             }
-            int removedItems = before.items().size() - after.items().size();
-            int removedSearchItems = before.searchItems().size() - after.searchItems().size();
+            int removedItems = before.itemCount() - after.itemCount();
+            int removedSearchItems = before.searchItemCount() - after.searchItemCount();
             if (removedItems > 0 || removedSearchItems > 0) {
                 trace(
                         "draft-sanitize tab={} itemsBefore={} itemsAfter={} removedDuplicates={} searchBefore={} searchAfter={} removedSearchDuplicates={}",
                         before.id(),
-                        before.items().size(),
-                        after.items().size(),
+                        before.itemCount(),
+                        after.itemCount(),
                         removedItems,
-                        before.searchItems().size(),
-                        after.searchItems().size(),
+                        before.searchItemCount(),
+                        after.searchItemCount(),
                         removedSearchItems
                 );
             }

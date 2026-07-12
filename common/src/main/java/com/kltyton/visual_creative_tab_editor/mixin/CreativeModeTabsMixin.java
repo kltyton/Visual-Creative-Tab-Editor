@@ -29,6 +29,6 @@ public abstract class CreativeModeTabsMixin {
             CreativeModeTab.ItemDisplayParameters parameters,
             CallbackInfo callback
     ) {
-        CreativeTabRuntime.rebuildSearchContents();
+        CreativeTabRuntime.refreshContents(parameters);
     }
 }

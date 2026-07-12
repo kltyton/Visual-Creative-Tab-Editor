@@ -17,11 +17,11 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.PreeditEvent;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
@@ -269,16 +269,6 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         return visible;
     }
 
-    @Inject(method = "getTooltipFromContainerItem", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$suppressItemTooltip(
-            ItemStack stack,
-            CallbackInfoReturnable<List<Component>> callback
-    ) {
-        if (this.visualCreativeTabEditor$editor().suppressesTooltips()) {
-            callback.setReturnValue(List.of());
-        }
-    }
-
     @Inject(method = "checkTabHovering", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$suppressTabTooltip(
             GuiGraphicsExtractor graphics,
@@ -324,6 +314,11 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     @Override
     public CreativeModeInventoryScreen visualCreativeTabEditor$screen() {
         return (CreativeModeInventoryScreen) (Object) this;
+    }
+
+    @Override
+    public boolean visualCreativeTabEditor$suppressesTooltips() {
+        return this.visualCreativeTabEditor$editor().suppressesItemTooltip(this.hoveredSlot);
     }
 
     @Override
