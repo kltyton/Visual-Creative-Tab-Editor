@@ -5,6 +5,7 @@ import com.kltyton.visual_creative_tab_editor.network.CreativeTabNetworkBridge;
 import com.kltyton.visual_creative_tab_editor.network.EditResultPayload;
 import com.kltyton.visual_creative_tab_editor.network.SnapshotChunkPayload;
 import java.util.List;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.client.gui.CreativeTabsScreenPage;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
@@ -19,8 +20,8 @@ public final class VisualCreativeTabEditorNeoForgeClient {
 
     /** Registers client payload handlers and the client-to-server transport bridge. */
     public static void register(IEventBus modEventBus) {
-        modEventBus.addListener(VisualCreativeTabEditorNeoForgeClient::registerPayloadHandlers);
-        NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditorNeoForgeClient::loggingOut);
+        modEventBus.addListener(EventPriority.HIGHEST, VisualCreativeTabEditorNeoForgeClient::registerPayloadHandlers);
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditorNeoForgeClient::loggingOut);
         CreativeTabNetworkBridge.installClientSender(ClientPacketDistributor::sendToServer);
         CreativeTabClientPlatform.preserveNativeTabPositions();
         CreativeTabClientPlatform.installVisibleTabsProvider(screen -> screen.getCurrentPage().getVisibleTabs());

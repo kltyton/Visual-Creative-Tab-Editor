@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Makes Fabric's page controls tolerate the one-frame tab-cache invalidation used during reloads. */
-@Mixin(value = CreativeModeInventoryScreen.class, priority = 500)
+@Mixin(value = CreativeModeInventoryScreen.class, priority = 2000)
 public abstract class FabricCreativeModeInventoryScreenMixin {
     @Inject(method = "hasAdditionalPages", at = @At("HEAD"), cancellable = true, remap = false)
     private void visualCreativeTabEditor$guardInvalidatedTabCache(

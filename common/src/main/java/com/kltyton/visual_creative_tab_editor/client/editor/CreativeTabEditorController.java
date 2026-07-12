@@ -694,7 +694,11 @@ public final class CreativeTabEditorController {
         }
         graphics.nextStratum();
         if (isModal()) {
-            graphics.fill(0, 0, this.host.visualCreativeTabEditor$screenWidth(), this.host.visualCreativeTabEditor$screenHeight(), 0x99000000);
+            if (isPicker()) {
+                renderPickerBackdrop(graphics);
+            } else {
+                graphics.fill(0, 0, this.host.visualCreativeTabEditor$screenWidth(), this.host.visualCreativeTabEditor$screenHeight(), 0x99000000);
+            }
         }
         if (this.mode == Mode.SAVING) {
             graphics.centeredText(
@@ -1129,11 +1133,17 @@ public final class CreativeTabEditorController {
             return;
         }
         trace(
-                "picker-open mode={} requested={} selectedAfter={} selectedType={}",
+                "picker-open mode={} requested={} selectedAfter={} selectedType={} panel=({},{} {}x{}) screen={}x{}",
                 pickerMode,
                 tabId(inventory),
                 tabId(this.host.visualCreativeTabEditor$selectedTab()),
-                this.host.visualCreativeTabEditor$selectedTab().getType()
+                this.host.visualCreativeTabEditor$selectedTab().getType(),
+                this.host.visualCreativeTabEditor$left(),
+                this.host.visualCreativeTabEditor$top(),
+                this.host.visualCreativeTabEditor$imageWidth(),
+                this.host.visualCreativeTabEditor$imageHeight(),
+                this.host.visualCreativeTabEditor$screenWidth(),
+                this.host.visualCreativeTabEditor$screenHeight()
         );
     }
 
@@ -1823,22 +1833,40 @@ public final class CreativeTabEditorController {
                 0xFFFFFFFF,
                 true
         );
-        for (Slot slot : this.host.visualCreativeTabEditor$menu().slots) {
-            if (slot == this.host.visualCreativeTabEditor$destroyItemSlot()
-                    || !slot.isActive()
-                    || this.host.visualCreativeTabEditor$isCreativeSlot(slot)
-                    || slot.x < 0
-                    || slot.y < 0) {
-                continue;
-            }
-            int x = this.host.visualCreativeTabEditor$left() + slot.x;
-            int y = this.host.visualCreativeTabEditor$top() + slot.y;
-            graphics.fill(x - 1, y - 1, x + 17, y + 17, 0xFF555555);
-            if (slot.hasItem()) {
-                graphics.item(slot.getItem(), x, y);
-            }
-        }
         renderModalExitButtons(graphics, mouseX, mouseY);
+    }
+
+    private void renderPickerBackdrop(GuiGraphicsExtractor graphics) {
+        int screenWidth = Math.max(0, this.host.visualCreativeTabEditor$screenWidth());
+        int screenHeight = Math.max(0, this.host.visualCreativeTabEditor$screenHeight());
+        int left = Mth.clamp(this.host.visualCreativeTabEditor$left(), 0, screenWidth);
+        int top = Mth.clamp(this.host.visualCreativeTabEditor$top(), 0, screenHeight);
+        int right = Mth.clamp(
+                this.host.visualCreativeTabEditor$left() + Math.max(0, this.host.visualCreativeTabEditor$imageWidth()),
+                0,
+                screenWidth
+        );
+        int bottom = Mth.clamp(
+                this.host.visualCreativeTabEditor$top() + Math.max(0, this.host.visualCreativeTabEditor$imageHeight()),
+                0,
+                screenHeight
+        );
+        if (left >= right || top >= bottom) {
+            graphics.fill(0, 0, screenWidth, screenHeight, 0x99000000);
+            return;
+        }
+        if (top > 0) {
+            graphics.fill(0, 0, screenWidth, top, 0x99000000);
+        }
+        if (left > 0) {
+            graphics.fill(0, top, left, bottom, 0x99000000);
+        }
+        if (right < screenWidth) {
+            graphics.fill(right, top, screenWidth, bottom, 0x99000000);
+        }
+        if (bottom < screenHeight) {
+            graphics.fill(0, bottom, screenWidth, screenHeight, 0x99000000);
+        }
     }
 
     private void renderModalExitButtons(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {

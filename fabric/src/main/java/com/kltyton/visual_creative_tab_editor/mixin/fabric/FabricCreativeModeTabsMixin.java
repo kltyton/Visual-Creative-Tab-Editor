@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** Re-paginates data-driven and unregistered runtime tabs for Fabric's native page API. */
-@Mixin(value = CreativeModeTabs.class, priority = 500)
+@Mixin(value = CreativeModeTabs.class, priority = 2000)
 public abstract class FabricCreativeModeTabsMixin {
     @Inject(method = "buildAllTabContents", at = @At("HEAD"))
     private static void visualCreativeTabEditor$restoreFabricValidationLayout(
