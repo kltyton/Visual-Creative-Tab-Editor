@@ -31,7 +31,7 @@ public final class CreativeTabRuntime {
     private static final ThreadLocal<State> PREVIEW = new ThreadLocal<>();
     private static final ThreadLocal<Integer> NATIVE_BYPASS = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<CreativeModeTab> FORCED_VISIBLE_TAB = new ThreadLocal<>();
-    private static final ThreadLocal<Boolean> LAST_HAS_PERMISSIONS = new ThreadLocal<>();
+    private static final AtomicReference<Boolean> LAST_HAS_PERMISSIONS = new AtomicReference<>();
 
     private CreativeTabRuntime() {
     }
@@ -47,7 +47,7 @@ public final class CreativeTabRuntime {
         PREVIEW.remove();
         PREVIEW_HANDOFF.set(null);
         ACTIVE.set(State.empty());
-        LAST_HAS_PERMISSIONS.remove();
+        LAST_HAS_PERMISSIONS.set(null);
         CreativeModeTabs.CACHED_PARAMETERS = null;
     }
 
@@ -87,6 +87,14 @@ public final class CreativeTabRuntime {
 
     public static boolean isForcedVisible(CreativeModeTab tab) {
         return FORCED_VISIBLE_TAB.get() == tab;
+    }
+
+    /** Records the client screen's exact operator-tab visibility decision across render/reload threads. */
+    public static void rememberClientPermissions(boolean hasPermissions) {
+        Boolean previous = LAST_HAS_PERMISSIONS.getAndSet(hasPermissions);
+        if (previous != null && previous != hasPermissions) {
+            CreativeModeTabs.CACHED_PARAMETERS = null;
+        }
     }
 
     public static void withForcedVisibility(CreativeModeTab tab, Runnable action) {
@@ -213,7 +221,6 @@ public final class CreativeTabRuntime {
     /** Projects catalog contents without relying on buildContents hooks that performance mods may memoize. */
     public static void refreshContents(CreativeModeTab.ItemDisplayParameters parameters) {
         Objects.requireNonNull(parameters, "parameters");
-        LAST_HAS_PERMISSIONS.set(parameters.hasPermissions());
         applyCatalogContents(parameters.hasPermissions());
         rebuildSearchContents();
     }
