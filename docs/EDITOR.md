@@ -21,7 +21,7 @@ mutate Minecraft's frozen registry.
 Search-tab items can be reordered by the same drag gesture, including while the
 search box is filtering the view. Visible stacks are matched back to the full
 working order by item and components. The persisted preferred-order prefix is
-bounded by both the per-tab 4096-item limit and the catalog-wide 65536-item
+bounded by both the per-tab 16384-item limit and the catalog-wide 65536-item
 limit; attempts outside that writable prefix are rejected with a diagnostic log
 instead of corrupting the order.
 

@@ -15,7 +15,7 @@ import java.util.Set;
 /** Shared limits and invariants for creative-tab data. */
 public final class CreativeTabValidation {
     public static final int MAX_TABS = 512;
-    public static final int MAX_ITEMS_PER_TAB = 4096;
+    public static final int MAX_ITEMS_PER_TAB = 16_384;
     public static final int MAX_TOTAL_ITEMS = 65_536;
     public static final int MAX_ORDER_ABS = 1_000_000;
     public static final int MAX_COMPONENT_TEXT_LENGTH = 32_768;
