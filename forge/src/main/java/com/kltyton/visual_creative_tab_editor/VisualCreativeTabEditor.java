@@ -16,6 +16,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
@@ -26,12 +27,14 @@ public final class VisualCreativeTabEditor {
     public VisualCreativeTabEditor() {
         VisualCreativeTabEditorForgeNetwork.initialize();
 
-        MinecraftForge.EVENT_BUS.addListener(VisualCreativeTabEditor::addReloadListeners);
-        MinecraftForge.EVENT_BUS.addListener(VisualCreativeTabEditor::serverStarted);
-        MinecraftForge.EVENT_BUS.addListener(VisualCreativeTabEditor::serverStopped);
-        MinecraftForge.EVENT_BUS.addListener(VisualCreativeTabEditor::datapackSync);
-        MinecraftForge.EVENT_BUS.addListener(VisualCreativeTabEditor::playerLoggedOut);
-        MinecraftForge.EVENT_BUS.addListener(VisualCreativeTabEditor::serverTick);
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::addReloadListeners);
+        // Capture only after other mods have finished their server-start creative-tab changes.
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, VisualCreativeTabEditor::serverStarted);
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::serverStopped);
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::datapackSync);
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::playerLoggedOut);
+        // Observe the final permission state for this tick.
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, VisualCreativeTabEditor::serverTick);
 
         CreativeTabNetworkBridge.installServerSender(VisualCreativeTabEditorForgeNetwork::sendToPlayer);
         CreativeTabNativeOrder.install(registryOrder -> {

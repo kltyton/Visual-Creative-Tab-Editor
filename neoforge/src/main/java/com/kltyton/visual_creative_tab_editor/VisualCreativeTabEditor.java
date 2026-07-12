@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -35,14 +36,16 @@ public final class VisualCreativeTabEditor {
     private static final String NETWORK_VERSION = "2";
     /** Creates and initializes the NeoForge mod entrypoint. */
     public VisualCreativeTabEditor(IEventBus modEventBus, ModContainer modContainer) {
-        modEventBus.addListener(VisualCreativeTabEditor::registerPayloads);
+        modEventBus.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::registerPayloads);
 
-        NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditor::addServerReloadListeners);
-        NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditor::serverStarted);
-        NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditor::serverStopped);
-        NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditor::datapackSync);
-        NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditor::playerLoggedOut);
-        NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditor::serverTick);
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::addServerReloadListeners);
+        // Capture only after other mods have finished their server-start creative-tab changes.
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, VisualCreativeTabEditor::serverStarted);
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::serverStopped);
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::datapackSync);
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditor::playerLoggedOut);
+        // Observe the final permission state for this tick.
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, VisualCreativeTabEditor::serverTick);
 
         CreativeTabNetworkBridge.installServerSender(PacketDistributor::sendToPlayer);
         CreativeTabNativeOrder.install(registryOrder -> {

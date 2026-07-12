@@ -24,7 +24,7 @@ and native Fabric/NeoForge/Forge pagination integration.
 
 | 项目 / Component | 版本 / Version |
 | --- | --- |
-| Mod | `1.0.0` |
+| Mod | `2.0.1` |
 | Minecraft | `1.21.1` |
 | Java | `21+` |
 | Fabric | Loader `0.16.9+` + Fabric API；configured with `0.109.0+1.21.1` |
@@ -58,9 +58,9 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 构建产物：
 
 ```text
-fabric/build/libs/visual_creative_tab_editor-fabric-1.21.1-1.0.0.jar
-neoforge/build/libs/visual_creative_tab_editor-neoforge-1.21.1-1.0.0.jar
-forge/build/libs/visual_creative_tab_editor-forge-1.21.1-1.0.0.jar
+fabric/build/libs/visual_creative_tab_editor-fabric-1.21.1-2.0.1.jar
+neoforge/build/libs/visual_creative_tab_editor-neoforge-1.21.1-2.0.1.jar
+forge/build/libs/visual_creative_tab_editor-forge-1.21.1-2.0.1.jar
 ```
 
 Minecraft 1.21.1 使用 Java 21。Gradle toolchain resolver 可以在需要时提供配置的 JDK。

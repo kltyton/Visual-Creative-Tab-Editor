@@ -5,6 +5,7 @@ import com.kltyton.visual_creative_tab_editor.network.EditResultPayload;
 import com.kltyton.visual_creative_tab_editor.network.SnapshotChunkPayload;
 import java.util.List;
 import net.minecraft.client.Minecraft;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.client.gui.CreativeTabsScreenPage;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -19,7 +20,7 @@ public final class VisualCreativeTabEditorNeoForgeClient {
 
     /** Registers client payload handlers and the client-to-server transport bridge. */
     public static void register() {
-        NeoForge.EVENT_BUS.addListener(VisualCreativeTabEditorNeoForgeClient::loggingOut);
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditorNeoForgeClient::loggingOut);
         CreativeTabNetworkBridge.installClientSender(PacketDistributor::sendToServer);
         CreativeTabClientPlatform.preserveNativeTabPositions();
         CreativeTabClientPlatform.installVisibleTabsProvider(screen -> screen.getCurrentPage().getVisibleTabs());
