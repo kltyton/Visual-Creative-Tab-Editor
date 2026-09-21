@@ -15,12 +15,13 @@ import java.util.Set;
 /** Shared limits and invariants for creative-tab data. */
 public final class CreativeTabValidation {
     public static final int MAX_TABS = 512;
-    public static final int MAX_ITEMS_PER_TAB = 16_384;
-    public static final int MAX_TOTAL_ITEMS = 65_536;
+    public static final int MAX_ITEMS_PER_TAB = 262_144;
+    public static final int MAX_TOTAL_ITEMS = 2_097_152;
     public static final int MAX_ORDER_ABS = 1_000_000;
     public static final int MAX_COMPONENT_TEXT_LENGTH = 32_768;
     public static final int MAX_CODEC_JSON_LENGTH = 131_072;
-    public static final int MAX_DOCUMENT_JSON_LENGTH = 2_097_152;
+    public static final int MAX_DOCUMENT_JSON_LENGTH = 32 * 1024 * 1024;
+    public static final int MAX_CATALOG_JSON_LENGTH = 64 * 1024 * 1024;
     private static final Map<ResourceLocation, CreativeTabType> FIXED_VANILLA_TYPES = Map.of(
             new ResourceLocation("minecraft", "hotbar"), CreativeTabType.HOTBAR,
             new ResourceLocation("minecraft", "search"), CreativeTabType.SEARCH,

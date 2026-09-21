@@ -32,6 +32,7 @@ public final class VisualCreativeTabEditor implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        com.kltyton.visual_creative_tab_editor.data.CreativeTabPreferences.configure(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
         VisualCreativeTabEditorCommon.initialize();
 
         CreativeTabNativeOrder.install(registryOrder -> Stream.concat(

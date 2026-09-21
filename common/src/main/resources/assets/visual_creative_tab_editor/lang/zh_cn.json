@@ -23,5 +23,21 @@
   "visual_creative_tab_editor.editor.sort.id_path": "按 ID 名称",
   "visual_creative_tab_editor.editor.sort.localized_name": "按物品名称",
   "visual_creative_tab_editor.editor.sort.full_id": "按完整 ID",
-  "visual_creative_tab_editor.editor.sort.mod_id": "按 Mod ID"
+  "visual_creative_tab_editor.editor.sort.mod_id": "按 Mod ID",
+  "visual_creative_tab_editor.editor.undo": "撤回",
+  "visual_creative_tab_editor.editor.restore": "恢复栏目",
+  "visual_creative_tab_editor.editor.default_order": "原始排序",
+  "visual_creative_tab_editor.editor.global_save": "跨档保存",
+  "visual_creative_tab_editor.editor.global_saved": "已保存为跨存档默认配置；没有已保存编辑的世界和服务器会使用它。",
+  "visual_creative_tab_editor.editor.global_failed": "无法保存跨存档默认配置，当前编辑未受影响。",
+  "visual_creative_tab_editor.editor.local_saved": "创造栏已保存在本机，仅对此服务器生效。",
+  "visual_creative_tab_editor.editor.redo": "重做",
+  "visual_creative_tab_editor.editor.history_failed": "布局已保存，但历史记录保存失败。请检查日志，旧历史文件已保留。",
+  "visual_creative_tab_editor.folders.tabs": "栏目抽屉",
+  "visual_creative_tab_editor.folders.items": "物品抽屉",
+  "visual_creative_tab_editor.folders.all": "显示全部",
+  "visual_creative_tab_editor.folders.vanilla": "原版",
+  "visual_creative_tab_editor.folders.mods": "模组",
+  "visual_creative_tab_editor.folders.hint": "点击文件夹展开，勾选框筛选内容",
+  "visual_creative_tab_editor.folders.empty": "没有符合筛选条件的来源"
 }

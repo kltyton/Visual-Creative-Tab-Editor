@@ -20,6 +20,7 @@ import net.minecraft.util.Mth;
 public final class VisualCreativeTabEditorClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
+        CreativeTabClientPlatform.installServerCapability(() -> ClientPlayNetworking.canSend(com.kltyton.visual_creative_tab_editor.network.EditChunkPayload.ID));
         ClientPlayNetworking.registerGlobalReceiver(
                 SnapshotChunkPayload.ID,
                 (client, handler, buffer, responseSender) -> {
@@ -74,7 +75,7 @@ public final class VisualCreativeTabEditorClient implements ClientModInitializer
                     || FabricCreativeTabPages.switchToPage(fabricScreen, targetPage);
             int pageAfterRestore = fabricScreen.fabric_currentPage();
             if (pageAfterResize != targetPage || pageAfterRestore != targetPage) {
-                VisualCreativeTabEditorConstants.LOGGER.info(
+                VisualCreativeTabEditorConstants.LOGGER.debug(
                         "[EditorTrace] fabric-screen-refresh-page-preserve before={} afterResize={} target={} restored={} afterRestore={} pageCount={}",
                         pageBeforeResize,
                         pageAfterResize,

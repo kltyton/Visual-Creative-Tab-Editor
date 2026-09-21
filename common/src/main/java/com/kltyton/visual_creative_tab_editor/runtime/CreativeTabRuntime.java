@@ -90,6 +90,10 @@ public final class CreativeTabRuntime {
     }
 
     /** Records the client screen's exact operator-tab visibility decision across render/reload threads. */
+    public static boolean hasClientPermissions() {
+        return Boolean.TRUE.equals(LAST_HAS_PERMISSIONS.get());
+    }
+
     public static void rememberClientPermissions(boolean hasPermissions) {
         Boolean previous = LAST_HAS_PERMISSIONS.getAndSet(hasPermissions);
         if (previous != null && previous != hasPermissions) {
@@ -173,10 +177,7 @@ public final class CreativeTabRuntime {
             return;
         }
         CreativeModeTab search = CreativeModeTabs.searchTab();
-        Collection<ItemStack> display = search.getDisplayItems();
-        Collection<ItemStack> searchable = search.getSearchTabDisplayItems();
-        display.clear();
-        searchable.clear();
+
         Map<Item, List<ItemStack>> aggregateByItem = new LinkedHashMap<>();
         List<ItemStack> insertionOrder = new ArrayList<>();
         effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream()).forEach(tab -> {
@@ -213,8 +214,7 @@ public final class CreativeTabRuntime {
                 ordered.add(stack);
             }
         }
-        display.addAll(ordered);
-        searchable.addAll(ordered);
+        ((CreativeTabContents) search).visualCreativeTabEditor$replaceContents(ordered, ordered);
         search.rebuildSearchTree();
     }
 
@@ -286,16 +286,16 @@ public final class CreativeTabRuntime {
             if (changedContents != null && !changedContents.contains(definition.id())) {
                 return;
             }
-            Collection<ItemStack> display = tab.getDisplayItems();
-            Collection<ItemStack> searchable = tab.getSearchTabDisplayItems();
-            display.clear();
-            searchable.clear();
+            Collection<ItemStack> display = new ArrayList<>();
+            Collection<ItemStack> searchable = new ArrayList<>();
             if (id(tab).filter(id -> id.equals(new ResourceLocation("minecraft", "op_blocks"))).isPresent()
                     && !hasPermissions) {
+                ((CreativeTabContents) tab).visualCreativeTabEditor$replaceContents(display, searchable);
                 return;
             }
             definition.copyItemsTo(display);
             definition.copySearchItemsTo(searchable);
+            ((CreativeTabContents) tab).visualCreativeTabEditor$replaceContents(display, searchable);
         });
     }
 

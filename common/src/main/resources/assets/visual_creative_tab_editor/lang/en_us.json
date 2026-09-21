@@ -23,5 +23,21 @@
   "visual_creative_tab_editor.editor.sort.id_path": "By ID name",
   "visual_creative_tab_editor.editor.sort.localized_name": "By item name",
   "visual_creative_tab_editor.editor.sort.full_id": "By full ID",
-  "visual_creative_tab_editor.editor.sort.mod_id": "By Mod ID"
+  "visual_creative_tab_editor.editor.sort.mod_id": "By Mod ID",
+  "visual_creative_tab_editor.editor.undo": "Undo",
+  "visual_creative_tab_editor.editor.restore": "Restore",
+  "visual_creative_tab_editor.editor.default_order": "Reset",
+  "visual_creative_tab_editor.editor.global_save": "Global",
+  "visual_creative_tab_editor.editor.global_saved": "Saved as the default for worlds and servers without saved edits.",
+  "visual_creative_tab_editor.editor.global_failed": "Could not save the global creative tab template. Your current edits are unchanged.",
+  "visual_creative_tab_editor.editor.local_saved": "Creative tabs saved locally for this server.",
+  "visual_creative_tab_editor.editor.redo": "Redo",
+  "visual_creative_tab_editor.editor.history_failed": "Layout saved, but history could not be saved. Check the log; the previous history file is preserved.",
+  "visual_creative_tab_editor.folders.tabs": "Tab folders",
+  "visual_creative_tab_editor.folders.items": "Item folders",
+  "visual_creative_tab_editor.folders.all": "Show all",
+  "visual_creative_tab_editor.folders.vanilla": "Vanilla",
+  "visual_creative_tab_editor.folders.mods": "Mods",
+  "visual_creative_tab_editor.folders.hint": "Click folder to expand; checkbox filters its contents.",
+  "visual_creative_tab_editor.folders.empty": "No matching sources"
 }

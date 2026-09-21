@@ -69,8 +69,11 @@ public final class CreativeTabEditorController {
     );
 
     private final CreativeTabEditorHost host;
+    private final CreativeTabFolderBrowser folders;
     private Mode mode = Mode.NORMAL;
     private @Nullable CreativeTabDraft draft;
+    private @Nullable CreativeTabHistory history;
+    private boolean dragCheckpointed;
     private @Nullable Press press;
     private @Nullable ResourceLocation contextTabId;
     private int contextItemIndex = -1;
@@ -106,9 +109,27 @@ public final class CreativeTabEditorController {
 
     public CreativeTabEditorController(CreativeTabEditorHost host) {
         this.host = Objects.requireNonNull(host, "host");
+        this.folders = new CreativeTabFolderBrowser(host, this::pickFolderItem);
+    }
+
+    private void pickFolderItem(int originalIndex, int button, boolean quickMove) {
+        var menu = this.host.visualCreativeTabEditor$menu();
+        int maxRow = Math.max(0, Mth.positiveCeilDiv(menu.items.size(), 9) - 5);
+        int row = Mth.clamp(originalIndex / 9, 0, maxRow);
+        float scroll = maxRow == 0 ? 0.0F : menu.getScrollForRowIndex(row);
+        this.host.visualCreativeTabEditor$setScrollOffset(scroll);
+        menu.scrollTo(scroll);
+        Slot slot = menu.slots.get(originalIndex - row * 9);
+        if (!this.host.visualCreativeTabEditor$isCreativeSlot(slot) || !slot.hasItem()) { return; }
+        this.replayingSlotClick = true;
+        try {
+            this.host.visualCreativeTabEditor$replaySlotClick(slot, slot.index, button,
+                    quickMove ? ClickType.QUICK_MOVE : ClickType.PICKUP);
+        } finally { this.replayingSlotClick = false; }
     }
 
     public void onInit() {
+        CreativeTabClientState.initializeLocalIfNeeded();
         if (isEditing() && this.draft != null) {
             if (!isPicker()) {
                 syncDraftCurrentTabToScreen("screen-init");
@@ -124,8 +145,13 @@ public final class CreativeTabEditorController {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        this.dragCheckpointed = false;
         this.pointerX = mouseX;
         this.pointerY = mouseY;
+        if (this.mode == Mode.NORMAL && this.folders.click(mouseX, mouseY, button, net.minecraft.client.gui.screens.Screen.hasShiftDown())) {
+            this.press = null;
+            return true;
+        }
         if (button != 0) {
             return isModal();
         }
@@ -281,6 +307,7 @@ public final class CreativeTabEditorController {
     }
 
     public boolean slotClicked(@Nullable Slot slot, int slotId, int button, ClickType input) {
+        if (this.folders.isOpen()) { return true; }
         boolean creativeSlot = slot != null && this.host.visualCreativeTabEditor$isCreativeSlot(slot);
         ItemStack carried = this.host.visualCreativeTabEditor$menu().getCarried();
         trace(
@@ -369,6 +396,7 @@ public final class CreativeTabEditorController {
             double deltaX,
             double deltaY
     ) {
+        if (this.folders.isOpen()) { return true; }
         Press active = this.press;
         if (active != null
                 && button == 0
@@ -466,6 +494,7 @@ public final class CreativeTabEditorController {
             traceDragStart(active, mouseX, mouseY, Mode.DRAG_TABS);
             int target = tabInsertionIndex(mouseX, mouseY);
             if (target >= 0 && target != this.lastDragTarget) {
+                checkpoint();
                 draft().moveSelectedTabs(target);
                 this.lastDragTarget = target;
                 preview();
@@ -503,6 +532,7 @@ public final class CreativeTabEditorController {
             if (target >= 0 && target != this.lastDragTarget) {
                 int row = this.host.visualCreativeTabEditor$menu()
                         .getRowIndexForScroll(this.host.visualCreativeTabEditor$scrollOffset());
+                checkpoint();
                 boolean moved = draft().moveSelectedItems(target);
                 this.lastDragTarget = target;
                 if (!moved) {
@@ -530,6 +560,7 @@ public final class CreativeTabEditorController {
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (this.folders.isOpen()) { return true; }
         this.pointerX = mouseX;
         this.pointerY = mouseY;
         if (this.mode == Mode.TAB_PROPERTIES && this.press == null) {
@@ -578,6 +609,7 @@ public final class CreativeTabEditorController {
             } else if (this.lastDragTarget < 0) {
                 int target = tabInsertionIndex(mouseX, mouseY);
                 if (target >= 0) {
+                    checkpoint();
                     draft().moveSelectedTabs(target);
                     preview();
                     this.host.visualCreativeTabEditor$refreshScreen();
@@ -701,7 +733,7 @@ public final class CreativeTabEditorController {
             }
         }
         if (this.mode == Mode.SAVING) {
-            graphics.drawCenteredString(
+            renderCenteredText(graphics,
                     this.host.visualCreativeTabEditor$font(),
                     Component.translatable("visual_creative_tab_editor.editor.saving"),
                     this.host.visualCreativeTabEditor$screenWidth() / 2,
@@ -711,7 +743,7 @@ public final class CreativeTabEditorController {
             return;
         }
         if (this.mode == Mode.CONFLICT) {
-            graphics.drawCenteredString(
+            renderCenteredText(graphics,
                     this.host.visualCreativeTabEditor$font(),
                     Component.translatable("visual_creative_tab_editor.editor.conflict"),
                     this.host.visualCreativeTabEditor$screenWidth() / 2,
@@ -773,17 +805,25 @@ public final class CreativeTabEditorController {
     }
 
     public boolean suppressesTooltips() {
-        return isEditing();
+        return isEditing() || this.folders.isOpen();
     }
 
     public boolean suppressesItemTooltip(@Nullable Slot hoveredSlot) {
-        return isEditing()
+        return this.folders.isOpen() || isEditing()
                 && (!isPicker()
                 || hoveredSlot == null
                 || this.host.visualCreativeTabEditor$isCreativeSlot(hoveredSlot));
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.folders.isOpen()) { if (keyCode == GLFW.GLFW_KEY_ESCAPE) { this.folders.close(); } return true; }
+        if (this.mode == Mode.EDIT && (modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
+            if (keyCode == GLFW.GLFW_KEY_Y || (keyCode == GLFW.GLFW_KEY_Z && (modifiers & GLFW.GLFW_MOD_SHIFT) != 0)) {
+                redo();
+                return true;
+            }
+            if (keyCode == GLFW.GLFW_KEY_Z) { undo(); return true; }
+        }
         if (this.mode != Mode.TAB_PROPERTIES) {
             if (isEditing() && keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 if (this.mode != Mode.SAVING) {
@@ -854,6 +894,7 @@ public final class CreativeTabEditorController {
     }
 
     public void removed() {
+        this.folders.close();
         if (this.draft != null) {
             trace(
                     "screen-removed-discard mode={} draftRevision={} currentTab={} tabs={} items={}",
@@ -872,6 +913,8 @@ public final class CreativeTabEditorController {
         clearPageHover("screen-removed");
         setVirtualTail(false, "screen-removed");
         this.draft = null;
+        this.history = null;
+        this.dragCheckpointed = false;
         this.mode = Mode.NORMAL;
         this.titleEditorInitialValue = null;
         this.host.visualCreativeTabEditor$hideTitleEditor();
@@ -879,6 +922,7 @@ public final class CreativeTabEditorController {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (this.folders.scroll(delta)) { return true; }
         return isModal();
     }
 
@@ -982,8 +1026,12 @@ public final class CreativeTabEditorController {
         this.nativeTabSelectionBefore = null;
         clearItemDragTabHover();
         clearPageHover("begin-edit");
+        this.history = null;
+        this.dragCheckpointed = false;
         var sourceCatalog = CreativeTabClientState.resolvedCatalog();
-        this.draft = CreativeTabDraft.fromCatalog(sourceCatalog);
+        this.history = CreativeTabHistory.open(CreativeTabClientState.contextFile("history"),
+                new CreativeTabHistory.State(sourceCatalog, CreativeTabRuntime.id(selected).orElse(null)), CreativeTabClientState.lookup());
+        this.draft = CreativeTabDraft.fromCatalog(this.history.anchor().catalog());
         this.draftRevision = CreativeTabClientState.revision();
         this.editorEntryTabId = CreativeTabRuntime.id(selected)
                 .filter(id -> this.draft.definition(id).isPresent())
@@ -1161,6 +1209,7 @@ public final class CreativeTabEditorController {
                 : draft().definition(this.contextTabId).orElse(null);
         ItemStack tabIconBefore = tabTargetBefore == null ? ItemStack.EMPTY : tabTargetBefore.icon();
         int resultIndex = -1;
+        checkpoint();
         switch (pickerMode) {
             case PICK_REPLACEMENT -> resultIndex = draft().replaceItem(this.contextItemIndex, picked);
             case PICK_NEW_ITEM -> resultIndex = draft().addItem(picked);
@@ -1256,6 +1305,30 @@ public final class CreativeTabEditorController {
     }
 
     private boolean clickControl(double x, double y) {
+        if (buttonAt(x, y, undoRect())) {
+            undo();
+            return true;
+        }
+        if (buttonAt(x, y, redoRect())) { redo(); return true; }
+        if (buttonAt(x, y, restoreRect())) {
+            restoreDeletedTabs();
+            return true;
+        }
+        if (buttonAt(x, y, defaultOrderRect())) {
+            checkpoint();
+            draft().restoreDefaultOrder(CreativeTabClientState.baseCatalog());
+            refreshAfterHistoryChange();
+            return true;
+        }
+        if (buttonAt(x, y, globalSaveRect())) {
+            boolean saved = CreativeTabClientState.saveGlobal(draft().toCatalog());
+            var player = this.host.visualCreativeTabEditor$minecraft().player;
+            if (player != null) {
+                player.sendSystemMessage(Component.translatable(saved
+                        ? "visual_creative_tab_editor.editor.global_saved" : "visual_creative_tab_editor.editor.global_failed"));
+            }
+            return true;
+        }
         if (buttonAt(x, y, saveRect())) {
             saveAndExit();
             return true;
@@ -1384,6 +1457,7 @@ public final class CreativeTabEditorController {
             );
             return false;
         }
+        checkpoint();
         draft().setTabTitle(tabId, next);
         this.titleEditorInitialValue = next;
         trace(
@@ -1405,6 +1479,7 @@ public final class CreativeTabEditorController {
                 int preferredRow = this.host.visualCreativeTabEditor$menu()
                         .getRowIndexForScroll(this.host.visualCreativeTabEditor$scrollOffset());
                 CreativeTabSortMode selected = modes.get(index);
+                checkpoint();
                 Comparator<ItemStack> comparator = itemComparator(selected);
                 if (currentType() == CreativeTabType.SEARCH) {
                     draft().sortCurrentSearchItems(draft().currentItems(), comparator);
@@ -1458,6 +1533,7 @@ public final class CreativeTabEditorController {
                         .findFirst()
                         .orElse(null)
                 : null;
+        checkpoint();
         draft().setTabsHidden(selected, true);
         draft().clearTabSelection();
         if (fallbackId != null) {
@@ -1525,6 +1601,7 @@ public final class CreativeTabEditorController {
         }
         int row = this.host.visualCreativeTabEditor$menu()
                 .getRowIndexForScroll(this.host.visualCreativeTabEditor$scrollOffset());
+        checkpoint();
         int removed = draft().deleteSelectedItems();
         preview();
         this.host.visualCreativeTabEditor$refreshScreen();
@@ -1539,7 +1616,79 @@ public final class CreativeTabEditorController {
         );
     }
 
+    private CreativeTabHistory.State currentEditState() {
+        return new CreativeTabHistory.State(draft().toCatalog(), draft().currentTabId().orElse(null));
+    }
+
+    private void checkpoint() {
+        if (this.mode == Mode.DRAG_ITEMS || this.mode == Mode.DRAG_TABS) {
+            if (this.dragCheckpointed) { return; }
+            this.dragCheckpointed = true;
+        }
+        if (this.history != null) { this.history.beforeChange(currentEditState()); }
+    }
+
+    private boolean canUndo() { return this.draft != null && this.history != null && this.history.hasUndo(); }
+    private boolean canRedo() { return this.draft != null && this.history != null && this.history.hasRedo(); }
+
+    private void undo() {
+        if (canUndo()) { restoreHistoryState(this.history.undo(currentEditState())); }
+    }
+
+    private void redo() {
+        if (canRedo()) { restoreHistoryState(this.history.redo(currentEditState())); }
+    }
+
+    private void restoreHistoryState(CreativeTabHistory.State state) {
+        this.draft = CreativeTabDraft.fromCatalog(state.catalog());
+        if (state.currentTab() != null && this.draft.definition(state.currentTab()).filter(tab -> !tab.hidden()).isPresent()) {
+            this.draft.setCurrentTab(state.currentTab());
+        }
+        this.contextTabId = null;
+        this.contextItemIndex = -1;
+        this.mode = Mode.EDIT;
+        refreshAfterHistoryChange();
+    }
+
+    private List<ResourceLocation> deletedTabIds() {
+        if (this.draft == null) {
+            return List.of();
+        }
+        CreativeTabCatalog baseline = CreativeTabClientState.baseCatalog();
+        return draft().tabs().stream().filter(CreativeTabDefinition::hidden)
+                .filter(tab -> baseline.definition(tab.id()).map(original -> !original.hidden()).orElse(true))
+                .map(CreativeTabDefinition::id).toList();
+    }
+
+    private void restoreDeletedTabs() {
+        List<ResourceLocation> deleted = deletedTabIds();
+        if (deleted.isEmpty()) {
+            return;
+        }
+        checkpoint();
+        draft().setTabsHidden(deleted, false);
+        refreshAfterHistoryChange();
+    }
+
+    private void refreshAfterHistoryChange() {
+        preview();
+        CreativeTabRuntime.rebuildSearchContents();
+        ResourceLocation selected = draft().currentTabId().orElse(null);
+        CreativeModeTab tab = CreativeTabRuntime.effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream())
+                .filter(candidate -> CreativeTabRuntime.id(candidate).filter(id -> id.equals(selected)).isPresent())
+                .findFirst().orElse(null);
+        this.host.visualCreativeTabEditor$refreshScreen();
+        if (tab != null) {
+            CreativeTabClientPlatform.revealTab(this.host.visualCreativeTabEditor$screen(), tab);
+            this.host.visualCreativeTabEditor$selectTab(tab);
+        }
+        ensureSearchOrderPrepared(this.host.visualCreativeTabEditor$selectedTab(), "restore-edit");
+        updateVirtualTail("restore-edit");
+        refreshCurrentDraftItems(0, "restore-edit");
+    }
+
     private void preview() {
+        if (this.history != null) { this.history.afterChange(draft().toCatalog()); }
         CreativeTabRuntime.setPreview(draft().toCatalog());
         CreativeTabClientPlatform.refreshTabLayout();
     }
@@ -1588,7 +1737,14 @@ public final class CreativeTabEditorController {
                 currentItemCount(),
                 currentSearchItemCount()
         );
+        CreativeTabRuntime.preparePreviewHandoff();
+        this.host.visualCreativeTabEditor$hideTitleEditor();
+        this.press = null;
+        this.saveReturnMode = returnMode;
+        this.mode = Mode.SAVING;
         if (!CreativeTabClientState.submit(this.draft.toCatalog(), this.draftRevision, this::handleEditResult)) {
+            CreativeTabRuntime.discardPreviewHandoff();
+            this.mode = returnMode;
             trace("save-submit-rejected baseRevision={} reason=client-submit-false", this.draftRevision);
             if (restoredPicker) {
                 this.mode = returnMode;
@@ -1601,11 +1757,6 @@ public final class CreativeTabEditorController {
             }
             return;
         }
-        CreativeTabRuntime.preparePreviewHandoff();
-        this.host.visualCreativeTabEditor$hideTitleEditor();
-        this.press = null;
-        this.saveReturnMode = returnMode;
-        this.mode = Mode.SAVING;
     }
 
     private void handleEditResult(EditResultPayload result) {
@@ -1614,6 +1765,13 @@ public final class CreativeTabEditorController {
         }
         if (result.success()) {
             trace("save-result success=true baseRevision={} newRevision={}", this.draftRevision, result.revision());
+            if (this.history != null && this.draft != null
+                    && !this.history.commit(currentEditState(), CreativeTabClientState.lookup())) {
+                var player = this.host.visualCreativeTabEditor$minecraft().player;
+                if (player != null) {
+                    player.sendSystemMessage(Component.translatable("visual_creative_tab_editor.editor.history_failed"));
+                }
+            }
             exitEditor(false);
             return;
         }
@@ -1663,6 +1821,8 @@ public final class CreativeTabEditorController {
         clearPageHover("exit-editor");
         setVirtualTail(false, "exit-editor");
         this.draft = null;
+        this.history = null;
+        this.dragCheckpointed = false;
         this.mode = Mode.NORMAL;
         this.titleEditorInitialValue = null;
         this.contextTabId = null;
@@ -1730,6 +1890,11 @@ public final class CreativeTabEditorController {
     }
 
     private void renderControls(GuiGraphics graphics, int mouseX, int mouseY) {
+        renderButton(graphics, undoRect(), "visual_creative_tab_editor.editor.undo", mouseX, mouseY, 0xFF555555);
+        renderButton(graphics, redoRect(), "visual_creative_tab_editor.editor.redo", mouseX, mouseY, 0xFF555555);
+        renderButton(graphics, restoreRect(), "visual_creative_tab_editor.editor.restore", mouseX, mouseY, 0xFF555555);
+        renderButton(graphics, defaultOrderRect(), "visual_creative_tab_editor.editor.default_order", mouseX, mouseY, 0xFF555555);
+        renderButton(graphics, globalSaveRect(), "visual_creative_tab_editor.editor.global_save", mouseX, mouseY, 0xFF315B7A);
         renderButton(graphics, saveRect(), "visual_creative_tab_editor.editor.save", mouseX, mouseY, 0xFF2D6A3F);
         renderButton(graphics, cancelRect(), "visual_creative_tab_editor.editor.cancel", mouseX, mouseY, 0xFF555555);
         renderButton(graphics, deleteRect(), "visual_creative_tab_editor.editor.delete", mouseX, mouseY, 0xFF8B2F2F);
@@ -1775,7 +1940,7 @@ public final class CreativeTabEditorController {
         graphics.fill(x, y, x + 8, y + 8, selected ? 0xFF2DAA4F : 0xCC222222);
         graphics.renderOutline(x, y, 8, 8, 0xFFFFFFFF);
         if (selected) {
-            graphics.drawString(this.host.visualCreativeTabEditor$font(), Component.literal("\u2713"), x + 1, y - 1, 0xFFFFFFFF, true);
+            graphics.drawString(this.host.visualCreativeTabEditor$font(), Component.literal("\u2713"), x + 1, y - 1, 0xFFFFFFFF, false);
         }
     }
 
@@ -1830,7 +1995,7 @@ public final class CreativeTabEditorController {
                 Math.max(4, this.host.visualCreativeTabEditor$left() + 8),
                 Math.max(4, this.host.visualCreativeTabEditor$top() - 18),
                 0xFFFFFFFF,
-                true
+                false
         );
         renderModalExitButtons(graphics, mouseX, mouseY);
     }
@@ -1873,17 +2038,38 @@ public final class CreativeTabEditorController {
         renderButton(graphics, cancelRect(), "visual_creative_tab_editor.editor.cancel", mouseX, mouseY, 0xFF555555);
     }
 
+    private static void renderCenteredText(GuiGraphics graphics, net.minecraft.client.gui.Font font,
+                                           Component text, int x, int y, int color) {
+        graphics.drawString(font, text, x - font.width(text) / 2, y, color, false);
+    }
+
     private void renderButton(GuiGraphics graphics, Rect rect, String key, int mouseX, int mouseY, int color) {
-        int actual = rect.contains(mouseX, mouseY) ? lighten(color) : color;
-        graphics.fill(rect.x, rect.y, rect.right(), rect.bottom(), actual);
-        graphics.renderOutline(rect.x, rect.y, rect.width, rect.height, 0xFFFFFFFF);
-        graphics.drawCenteredString(this.host.visualCreativeTabEditor$font(), Component.translatable(key), rect.x + rect.width / 2, rect.y + 5, 0xFFFFFFFF);
+        boolean enabled = !key.endsWith(".undo") || canUndo();
+        enabled &= !key.endsWith(".redo") || canRedo();
+        enabled &= !key.endsWith(".restore") || !deletedTabIds().isEmpty();
+        boolean hovered = enabled && rect.contains(mouseX, mouseY);
+        boolean green = color == 0xFF2D6A3F;
+        boolean red = color == 0xFF8B2F2F;
+        int face = !enabled ? 0xFF777777 : green ? (hovered ? 0xFF4C9E35 : 0xFF3C8527)
+                : red ? (hovered ? 0xFFC94D3F : 0xFFAA382C) : (hovered ? 0xFFE0E0E0 : 0xFFC6C6C6);
+        graphics.fill(rect.x, rect.y, rect.right(), rect.bottom(), 0xFF1E1E1E);
+        graphics.fill(rect.x + 1, rect.y + 1, rect.right() - 1, rect.bottom() - 1, 0xFF454545);
+        graphics.fill(rect.x + 2, rect.y + 2, rect.right() - 2, rect.bottom() - 3, face);
+        graphics.fill(rect.x + 2, rect.y + 1, rect.right() - 2, rect.y + 2, enabled ? 0xFFEEEEEE : 0xFF999999);
+        graphics.fill(rect.x + 1, rect.y + 2, rect.x + 2, rect.bottom() - 3, enabled ? 0xFFEEEEEE : 0xFF999999);
+        if (hovered) {
+            graphics.renderOutline(rect.x, rect.y, rect.width, rect.height, 0xFFFFFFFF);
+        }
+        var font = this.host.visualCreativeTabEditor$font();
+        String label = font.plainSubstrByWidth(Component.translatable(key).getString(), Math.max(0, rect.width - 6));
+        renderCenteredText(graphics, font, Component.literal(label), rect.x + rect.width / 2, rect.y + 4,
+                !enabled ? 0xFFB0B0B0 : green || red ? 0xFFFFFFFF : 0xFF202020);
     }
 
     private void renderItemPlus(GuiGraphics graphics, Rect rect) {
         graphics.fill(rect.x, rect.y, rect.right(), rect.bottom(), 0x66333333);
         graphics.renderOutline(rect.x, rect.y, rect.width, rect.height, 0x88FFFFFF);
-        graphics.drawCenteredString(this.host.visualCreativeTabEditor$font(), Component.literal("+"), rect.x + rect.width / 2, rect.y + 4, 0xAAFFFFFF);
+        renderCenteredText(graphics, this.host.visualCreativeTabEditor$font(), Component.literal("+"), rect.x + rect.width / 2, rect.y + 4, 0xAAFFFFFF);
     }
 
     private void renderTabPlus(
@@ -1906,7 +2092,7 @@ public final class CreativeTabEditorController {
         );
         int shade = target.hitRect().contains(mouseX, mouseY) ? 0x44333333 : 0x66333333;
         graphics.fill(sprite.x, sprite.y, sprite.right(), sprite.bottom(), shade);
-        graphics.drawCenteredString(
+        renderCenteredText(graphics,
                 this.host.visualCreativeTabEditor$font(),
                 Component.literal("+"),
                 sprite.x + sprite.width / 2,
@@ -2066,6 +2252,7 @@ public final class CreativeTabEditorController {
         if (elapsed < ITEM_DRAG_TAB_HOVER_MILLIS) {
             return true;
         }
+        checkpoint();
         int moved = draft().moveSelectedItemsToTab(targetId);
         if (moved < 0) {
             trace(
@@ -2262,6 +2449,11 @@ public final class CreativeTabEditorController {
     private boolean isEditorControlAt(double x, double y) {
         return buttonAt(x, y, saveRect())
                 || buttonAt(x, y, cancelRect())
+                || buttonAt(x, y, redoRect())
+                || buttonAt(x, y, undoRect())
+                || buttonAt(x, y, restoreRect())
+                || buttonAt(x, y, defaultOrderRect())
+                || buttonAt(x, y, globalSaveRect())
                 || buttonAt(x, y, deleteRect())
                 || buttonAt(x, y, sortRect())
                 || isCreativeScrollbarAt(x, y);
@@ -2660,6 +2852,17 @@ public final class CreativeTabEditorController {
         return "visual_creative_tab_editor.editor.sort." + mode.name().toLowerCase(java.util.Locale.ROOT);
     }
 
+    private Rect sideActionRect(int row) {
+        return new Rect(sideControlX(), this.host.visualCreativeTabEditor$top() + 4 + row * (BUTTON_HEIGHT + 3),
+                BUTTON_WIDTH, BUTTON_HEIGHT);
+    }
+
+    private Rect undoRect() { return sideActionRect(2); }
+    private Rect redoRect() { return sideActionRect(3); }
+    private Rect restoreRect() { return sideActionRect(4); }
+    private Rect defaultOrderRect() { return sideActionRect(5); }
+    private Rect globalSaveRect() { return sideActionRect(6); }
+
     private Rect saveRect() {
         return new Rect(sideControlX(), this.host.visualCreativeTabEditor$top() + 4, BUTTON_WIDTH, BUTTON_HEIGHT);
     }
@@ -2996,7 +3199,7 @@ public final class CreativeTabEditorController {
     }
 
     private static void trace(String message, Object... arguments) {
-        VisualCreativeTabEditorConstants.LOGGER.info("[EditorTrace] " + message, arguments);
+        VisualCreativeTabEditorConstants.LOGGER.debug("[EditorTrace] " + message, arguments);
     }
 
     private CreativeTabDraft draft() {

@@ -70,7 +70,7 @@ public final class FabricCreativeTabPages {
         }
         if (signature != lastLoggedSignature) {
             lastLoggedSignature = signature;
-            VisualCreativeTabEditorConstants.LOGGER.info(
+            VisualCreativeTabEditorConstants.LOGGER.debug(
                     "[EditorTrace] fabric-tab-pages-repacked ordinary={} visible={} hidden={} pages={}",
                     ordinary.size(),
                     visibleIndex,
@@ -148,7 +148,7 @@ public final class FabricCreativeTabPages {
                     tab.column()
             );
         }
-        VisualCreativeTabEditorConstants.LOGGER.info(
+        VisualCreativeTabEditorConstants.LOGGER.debug(
                 "[EditorTrace] fabric-vanilla-baseline-captured tabs={} page=0",
                 VANILLA_BASELINE.size()
         );

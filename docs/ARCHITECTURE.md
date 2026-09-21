@@ -3,7 +3,7 @@
 ## Version baseline
 
 This branch targets Minecraft 1.20.1 on Java 17. Its loader modules are Fabric
-0.16.9 with Fabric API 0.92.1+1.20.1, and Forge 47.2.30. Shared Gradle
+0.16.9 with Fabric API 0.92.1+1.20.1, and Forge 47.4.23. Shared Gradle
 conventions are implemented in `buildSrc/`.
 
 The built-in creative-tab registry remains frozen. Registered vanilla and modded

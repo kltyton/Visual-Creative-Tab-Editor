@@ -36,8 +36,8 @@ public final class CreativeTabCatalogJson {
 
     public static CreativeTabCatalog decode(String json, HolderLookup.Provider registries) {
         Objects.requireNonNull(json, "json");
-        if (json.length() > 16 * 1024 * 1024) {
-            throw new JsonParseException("Creative tab catalog exceeds 16 MiB");
+        if (json.length() > CreativeTabValidation.MAX_CATALOG_JSON_LENGTH) {
+            throw new JsonParseException("Creative tab catalog exceeds 64 MiB");
         }
         JsonElement element = JsonParser.parseString(json);
         if (!element.isJsonObject()) {

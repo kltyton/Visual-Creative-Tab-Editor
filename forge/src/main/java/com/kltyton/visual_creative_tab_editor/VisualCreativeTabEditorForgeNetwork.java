@@ -22,9 +22,13 @@ public final class VisualCreativeTabEditorForgeNetwork {
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "main"),
             () -> NETWORK_VERSION,
-            NETWORK_VERSION::equals,
-            NETWORK_VERSION::equals
+            version -> NETWORK_VERSION.equals(version) || NetworkRegistry.ABSENT.equals(version) || NetworkRegistry.ACCEPTVANILLA.equals(version),
+            version -> NETWORK_VERSION.equals(version) || NetworkRegistry.ABSENT.equals(version) || NetworkRegistry.ACCEPTVANILLA.equals(version)
     );
+    public static boolean isRemotePresent(net.minecraft.network.Connection connection) {
+        return CHANNEL.isRemotePresent(connection);
+    }
+
     private static boolean initialized;
 
     private VisualCreativeTabEditorForgeNetwork() {
@@ -66,7 +70,9 @@ public final class VisualCreativeTabEditorForgeNetwork {
         if (!(payload instanceof SnapshotChunkPayload) && !(payload instanceof EditResultPayload)) {
             throw new IllegalArgumentException("Unsupported clientbound creative-tab payload " + payload.id());
         }
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), payload);
+        if (CHANNEL.isRemotePresent(player.connection.connection)) {
+            CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), payload);
+        }
     }
 
     public static void sendToServer(CreativeTabPayload payload) {

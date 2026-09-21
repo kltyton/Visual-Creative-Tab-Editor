@@ -10,6 +10,16 @@ import net.minecraft.world.item.CreativeModeTabs;
 
 /** Loader-specific current-page view used by the shared editor. */
 public final class CreativeTabClientPlatform {
+    private static volatile java.util.function.BooleanSupplier serverCapability = () -> true;
+
+    public static void installServerCapability(java.util.function.BooleanSupplier capability) {
+        serverCapability = Objects.requireNonNull(capability);
+    }
+
+    public static boolean serverSupportsEditing() {
+        return serverCapability.getAsBoolean();
+    }
+
     private static volatile boolean preserveNativeTabPositions;
     private static final AtomicReference<VisibleTabsProvider> VISIBLE_TABS = new AtomicReference<>(
             screen -> CreativeModeTabs.tabs()

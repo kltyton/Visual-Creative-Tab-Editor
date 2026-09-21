@@ -13,7 +13,7 @@ mixin {
 legacyForge {
     version = "${minecraft_version}-${forge_version}"
 
-    // Forge 47.2.30's own bundled AT contains legacy rules rejected by modern
+    // Forge's own bundled AT contains legacy rules rejected by modern
     // JST strict validation. Our loader AT is validated separately and still
     // participates in source/runtime transformation.
     validateAccessTransformers = false

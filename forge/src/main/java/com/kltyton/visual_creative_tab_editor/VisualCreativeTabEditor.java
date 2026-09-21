@@ -53,6 +53,7 @@ public final class VisualCreativeTabEditor {
 
         DistExecutor.safeRunWhenOn(Dist.CLIENT, () -> VisualCreativeTabEditorForgeClient::register);
 
+        com.kltyton.visual_creative_tab_editor.data.CreativeTabPreferences.configure(net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get());
         VisualCreativeTabEditorCommon.initialize();
     }
 

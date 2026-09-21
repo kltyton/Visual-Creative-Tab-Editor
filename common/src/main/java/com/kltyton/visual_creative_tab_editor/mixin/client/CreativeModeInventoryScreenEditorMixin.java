@@ -163,7 +163,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         pose.translate(0.0F, 0.0F, 500.0F);
         if (!this.visualCreativeTabEditor$loggedOverlayDepth) {
             this.visualCreativeTabEditor$loggedOverlayDepth = true;
-            VisualCreativeTabEditorConstants.LOGGER.info(
+            VisualCreativeTabEditorConstants.LOGGER.debug(
                     "[EditorTrace] overlay-depth baseZ={} overlayZ={} flush=true",
                     baseZ,
                     pose.last().pose().m32()
@@ -180,7 +180,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     @Inject(method = "selectTab", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$rejectHiddenTab(CreativeModeTab tab, CallbackInfo callback) {
         boolean reject = !CreativeTabRuntime.catalog().isEmpty() && !tab.shouldDisplay();
-        VisualCreativeTabEditorConstants.LOGGER.info(
+        VisualCreativeTabEditorConstants.LOGGER.debug(
                 "[EditorTrace] native-select-tab-head requested={} shouldDisplay={} selectedBefore={} catalogEmpty={} rejected={}",
                 visualCreativeTabEditor$traceTabId(tab),
                 tab.shouldDisplay(),
@@ -195,7 +195,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
 
     @Inject(method = "selectTab", at = @At("RETURN"))
     private void visualCreativeTabEditor$traceSelectedTab(CreativeModeTab tab, CallbackInfo callback) {
-        VisualCreativeTabEditorConstants.LOGGER.info(
+        VisualCreativeTabEditorConstants.LOGGER.debug(
                 "[EditorTrace] native-select-tab-return requested={} selectedAfter={} success={}",
                 visualCreativeTabEditor$traceTabId(tab),
                 visualCreativeTabEditor$traceTabId(this.visualCreativeTabEditor$selectedTab()),
@@ -214,7 +214,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
                 && selected.getType() == CreativeModeTab.Type.CATEGORY
                 && CreativeTabRuntime.definition(selected).isPresent();
         if (keepSelected) {
-            VisualCreativeTabEditorConstants.LOGGER.info(
+            VisualCreativeTabEditorConstants.LOGGER.debug(
                     "[EditorTrace] empty-data-tab-preserved selected={} displayItems=0",
                     visualCreativeTabEditor$traceTabId(selected)
             );
@@ -490,7 +490,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
                         && mouseY < widget.getY() + widget.getHeight())
                 .toList();
         boolean hit = !pageButtons.isEmpty();
-        VisualCreativeTabEditorConstants.LOGGER.info(
+        VisualCreativeTabEditorConstants.LOGGER.debug(
                 "[EditorTrace] page-button-hit-test x={} y={} hit={} widgets={}",
                 mouseX,
                 mouseY,
@@ -524,6 +524,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
                 20,
                 Component.translatable("visual_creative_tab_editor.editor.title")
         );
+        ((com.kltyton.visual_creative_tab_editor.client.editor.ShadowlessTextInput) editor).visualCreativeTabEditor$disableTextShadow();
         editor.setMaxLength(128);
         editor.setValue(value);
         this.visualCreativeTabEditor$titleEditor = this.addWidget(editor);

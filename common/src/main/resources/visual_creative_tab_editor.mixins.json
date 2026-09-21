@@ -13,6 +13,7 @@
   ],
   "client": [
     "client.ScreenEditorOverlayMixin",
+    "client.EditBoxTextShadowMixin",
     "client.AbstractContainerScreenTooltipMixin",
     "client.CreativeModeInventoryScreenEditorMixin",
     "client.CreativeModeItemPickerMenuVirtualTailMixin"
