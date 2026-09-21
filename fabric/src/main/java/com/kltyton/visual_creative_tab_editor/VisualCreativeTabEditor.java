@@ -32,6 +32,7 @@ public final class VisualCreativeTabEditor implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        com.kltyton.visual_creative_tab_editor.data.CreativeTabPreferences.configure(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
         VisualCreativeTabEditorCommon.initialize();
 
         CreativeTabNativeOrder.install(registryOrder -> Stream.concat(
@@ -60,7 +61,11 @@ public final class VisualCreativeTabEditor implements ModInitializer {
                 EditChunkPayload.TYPE,
                 (payload, context) -> CreativeTabServerManager.handleEditChunk(context.player(), payload)
         );
-        CreativeTabNetworkBridge.installServerSender(ServerPlayNetworking::send);
+        CreativeTabNetworkBridge.installServerSender((player, payload) -> {
+            if (ServerPlayNetworking.canSend(player, payload.type())) {
+                ServerPlayNetworking.send(player, payload);
+            }
+        });
 
         ServerLifecycleEvents.SERVER_STARTED.register(CreativeTabServerManager::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPED.register(CreativeTabServerManager::onServerStopped);
