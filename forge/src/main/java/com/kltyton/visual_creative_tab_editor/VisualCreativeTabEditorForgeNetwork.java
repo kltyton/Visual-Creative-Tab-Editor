@@ -22,7 +22,12 @@ public final class VisualCreativeTabEditorForgeNetwork {
                     "main"
             ))
             .networkProtocolVersion(NETWORK_VERSION)
+            .optional()
             .simpleChannel();
+    public static boolean isRemotePresent(net.minecraft.network.Connection connection) {
+        return CHANNEL.isRemotePresent(connection);
+    }
+
     private static boolean initialized;
 
     private VisualCreativeTabEditorForgeNetwork() {
@@ -50,7 +55,9 @@ public final class VisualCreativeTabEditorForgeNetwork {
     }
 
     public static void sendToPlayer(ServerPlayer player, CustomPacketPayload payload) {
-        CHANNEL.send(payload, PacketDistributor.PLAYER.with(player));
+        if (CHANNEL.isRemotePresent(player.connection.getConnection())) {
+            CHANNEL.send(payload, PacketDistributor.PLAYER.with(player));
+        }
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

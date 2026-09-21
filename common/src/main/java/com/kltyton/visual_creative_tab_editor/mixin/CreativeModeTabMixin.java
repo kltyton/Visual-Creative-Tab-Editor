@@ -18,12 +18,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(CreativeModeTab.class)
-public abstract class CreativeModeTabMixin {
+public abstract class CreativeModeTabMixin implements com.kltyton.visual_creative_tab_editor.runtime.CreativeTabContents {
     @Shadow
     private Collection<ItemStack> displayItems;
 
     @Shadow
     private Set<ItemStack> displayItemsSearchTab;
+
+    @Override
+    public void visualCreativeTabEditor$replaceContents(Collection<ItemStack> display, Collection<ItemStack> searchable) {
+        Collection<ItemStack> newDisplay = new java.util.ArrayList<>(display);
+        Set<ItemStack> newSearch = net.minecraft.world.item.ItemStackLinkedSet.createTypeAndComponentsSet();
+        newSearch.addAll(searchable);
+        this.displayItems = newDisplay;
+        this.displayItemsSearchTab = newSearch;
+    }
 
     @Inject(method = "getDisplayName", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$getDisplayName(CallbackInfoReturnable<Component> callback) {
@@ -121,8 +130,7 @@ public abstract class CreativeModeTabMixin {
             CreativeTabDefinition definition,
             CreativeModeTab.ItemDisplayParameters parameters
     ) {
-        this.displayItems.clear();
-        this.displayItemsSearchTab.clear();
+        visualCreativeTabEditor$replaceContents(java.util.List.of(), java.util.List.of());
         if (isOperatorUtilities() && !parameters.hasPermissions()) {
             return;
         }

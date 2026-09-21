@@ -47,7 +47,11 @@ public final class VisualCreativeTabEditor {
         // Observe the final permission state for this tick.
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, VisualCreativeTabEditor::serverTick);
 
-        CreativeTabNetworkBridge.installServerSender(PacketDistributor::sendToPlayer);
+        CreativeTabNetworkBridge.installServerSender((player, payload) -> {
+            if (player.connection.hasChannel(payload.type())) {
+                PacketDistributor.sendToPlayer(player, payload);
+            }
+        });
         CreativeTabNativeOrder.install(registryOrder -> {
             ArrayList<net.minecraft.world.item.CreativeModeTab> ordered = new ArrayList<>(
                     CreativeModeTabRegistry.getSortedCreativeModeTabs()
@@ -63,11 +67,12 @@ public final class VisualCreativeTabEditor {
             registerClient();
         }
 
+        com.kltyton.visual_creative_tab_editor.data.CreativeTabPreferences.configure(net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get());
         VisualCreativeTabEditorCommon.initialize();
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
+        PayloadRegistrar registrar = event.registrar(NETWORK_VERSION).optional();
         if (FMLEnvironment.dist == Dist.CLIENT) {
             VisualCreativeTabEditorNeoForgeClient.registerPayloads(registrar);
         } else {

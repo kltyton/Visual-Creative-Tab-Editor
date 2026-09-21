@@ -22,6 +22,10 @@ public final class VisualCreativeTabEditorNeoForgeClient {
     public static void register() {
         NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditorNeoForgeClient::loggingOut);
         CreativeTabNetworkBridge.installClientSender(PacketDistributor::sendToServer);
+        CreativeTabClientPlatform.installServerCapability(() -> {
+            var connection = net.minecraft.client.Minecraft.getInstance().getConnection();
+            return connection != null && connection.hasChannel(com.kltyton.visual_creative_tab_editor.network.EditChunkPayload.TYPE);
+        });
         CreativeTabClientPlatform.preserveNativeTabPositions();
         CreativeTabClientPlatform.installVisibleTabsProvider(screen -> screen.getCurrentPage().getVisibleTabs());
         CreativeTabClientPlatform.installTabRevealer((screen, tab) -> {

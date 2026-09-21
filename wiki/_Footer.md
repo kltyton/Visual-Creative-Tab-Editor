@@ -1,1 +1,1 @@
-[源代码](https://github.com/kltyton/Visual-Creative-Tab-Editor) · [问题反馈](https://github.com/kltyton/Visual-Creative-Tab-Editor/issues) · CC0-1.0 · Minecraft 1.21.1
+[源代码](https://github.com/kltyton/Visual-Creative-Tab-Editor) · [问题反馈](https://github.com/kltyton/Visual-Creative-Tab-Editor/issues) · LGPL-3.0-or-later · Minecraft 1.21.1

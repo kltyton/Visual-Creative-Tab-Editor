@@ -104,7 +104,7 @@ public final class CreativeTabServerManager {
                 prepared.snapshot().uncompressedSize(),
                 prepared.snapshot().chunks()
         );
-        VisualCreativeTabEditorConstants.LOGGER.info(
+        VisualCreativeTabEditorConstants.LOGGER.debug(
                 "[EditorTrace] creative-tab-reload-applied baseTabs={} resolvedTabs={} defaultPresent={} "
                         + "revision={} snapshotChunks={} mutation={}",
                 base.orderedDefinitions().size(),
@@ -124,6 +124,20 @@ public final class CreativeTabServerManager {
             CreativeTabCatalog nativeCatalog = captureNativeCatalog(startedServer);
             Path root = datapackRoot(startedServer).resolve(PinnedWorldPackSource.DEFAULT_DIRECTORY);
             boolean changed = writePack(root, fullDocuments(nativeCatalog, startedServer.registryAccess()), "Generated native creative tabs");
+            Path playerRoot = datapackRoot(startedServer).resolve(PinnedWorldPackSource.PLAYER_DIRECTORY);
+            if (!Files.exists(playerRoot)) {
+                try {
+                    var preferences = com.kltyton.visual_creative_tab_editor.data.CreativeTabPreferences.globalFile();
+                    if (Files.isRegularFile(preferences)) {
+                        CreativeTabCatalog defaults = com.kltyton.visual_creative_tab_editor.data.CreativeTabPreferences
+                                .load(preferences, nativeCatalog, startedServer.registryAccess());
+                        changed |= writePack(playerRoot, overrideDocuments(nativeCatalog, defaults, startedServer.registryAccess()),
+                                "Player creative tab overrides");
+                    }
+                } catch (IOException exception) {
+                    VisualCreativeTabEditorConstants.LOGGER.warn("Could not load the global creative tab template; keeping native tabs", exception);
+                }
+            }
             if (migrated || changed || !defaultPresent) {
                 reloadWorldPacks(startedServer);
             }
@@ -442,7 +456,7 @@ public final class CreativeTabServerManager {
             }
         }
         SYNC_STATE.put(player.getUUID(), new SyncState(snapshot.revision(), canEdit));
-        VisualCreativeTabEditorConstants.LOGGER.info(
+        VisualCreativeTabEditorConstants.LOGGER.debug(
                 "[EditorTrace] snapshot-sent player={} revision={} canEdit={} chunks={}",
                 player.getScoreboardName(),
                 snapshot.revision(),
@@ -510,7 +524,7 @@ public final class CreativeTabServerManager {
                 VisualCreativeTabEditorConstants.LOGGER.error("Creative-tab data pack reload failed", throwable);
                 return;
             }
-            VisualCreativeTabEditorConstants.LOGGER.info(
+            VisualCreativeTabEditorConstants.LOGGER.debug(
                     "[EditorTrace] creative-tab-reload-complete defaultPresent={} baseTabs={} resolvedTabs={} "
                             + "revision={} defaultSelected={} playerSelected={}",
                     defaultPresent,
@@ -546,7 +560,7 @@ public final class CreativeTabServerManager {
             ordered.add(PinnedWorldPackSource.PLAYER_PACK_ID);
         }
 
-        VisualCreativeTabEditorConstants.LOGGER.info(
+        VisualCreativeTabEditorConstants.LOGGER.debug(
                 "[EditorTrace] creative-tab-reload-selection selectedBefore={} selectedAfter={} "
                         + "defaultAvailable={} defaultRequired={} defaultSelectedBefore={} "
                         + "playerAvailable={} playerRequired={} playerSelectedBefore={}",
@@ -624,22 +638,32 @@ public final class CreativeTabServerManager {
     }
 
     public static boolean writePlayerOverrides(CreativeTabCatalog target) throws IOException {
+        return writePack(playerPackRoot(), overrideDocuments(base, target, registries()), "Player creative tab overrides");
+    }
+
+    private static Map<Path, String> overrideDocuments(CreativeTabCatalog baseline, CreativeTabCatalog target,
+                                                       HolderLookup.Provider lookup) {
         Map<Path, String> documents = new LinkedHashMap<>();
         for (CreativeTabDefinition targetDefinition : target.orderedDefinitions()) {
-            CreativeTabDefinition baseDefinition = base.definition(targetDefinition.id()).orElse(null);
+            CreativeTabDefinition baseDefinition = baseline.definition(targetDefinition.id()).orElse(null);
             CreativeTabPatch patch = baseDefinition == null
                     ? CreativeTabPatch.full(targetDefinition)
                     : CreativeTabPatch.diff(baseDefinition, targetDefinition);
             if (!patch.isEmpty()) {
                 ResourceLocation file = CreativeTabJsonCodec.resourceFileFromTabId(targetDefinition.id());
                 Path relative = Path.of("data", file.getNamespace(), file.getPath());
-                documents.put(relative, PRETTY_GSON.toJson(CreativeTabJsonCodec.encodePatch(patch, registries())) + "\n");
+                documents.put(relative, PRETTY_GSON.toJson(CreativeTabJsonCodec.encodePatch(patch, lookup)) + "\n");
             }
         }
-        return writePack(playerPackRoot(), documents, "Player creative tab overrides");
+        return documents;
     }
 
     private static CreativeTabCatalog captureNativeCatalog(MinecraftServer target) {
+        return captureNativeCatalog(new CreativeModeTab.ItemDisplayParameters(
+                target.getWorldData().enabledFeatures(), true, target.registryAccess()));
+    }
+
+    public static CreativeTabCatalog captureNativeCatalog(CreativeModeTab.ItemDisplayParameters parameters) {
         return CreativeTabRuntime.withNativeBypass(() -> {
             List<CreativeModeTab> registryTabs = BuiltInRegistries.CREATIVE_MODE_TAB.stream().toList();
             Map<CreativeModeTab, NativeContents> originalContents = new IdentityHashMap<>();
@@ -651,11 +675,6 @@ public final class CreativeTabServerManager {
                 originalContents.put(tab, new NativeContents(displayItems, searchItems));
             }
             try {
-                CreativeModeTab.ItemDisplayParameters parameters = new CreativeModeTab.ItemDisplayParameters(
-                        target.getWorldData().enabledFeatures(),
-                        true,
-                        target.registryAccess()
-                );
                 for (CreativeModeTab tab : registryTabs) {
                     if (tab.getType() == CreativeModeTab.Type.CATEGORY) {
                         rebuildNativeContents(tab, parameters, originalContents.get(tab));
@@ -772,10 +791,8 @@ public final class CreativeTabServerManager {
     }
 
     private static void restoreNativeContents(CreativeModeTab tab, NativeContents contents) {
-        tab.getDisplayItems().clear();
-        tab.getDisplayItems().addAll(contents.displayItems());
-        tab.getSearchTabDisplayItems().clear();
-        tab.getSearchTabDisplayItems().addAll(contents.searchItems());
+        ((com.kltyton.visual_creative_tab_editor.runtime.CreativeTabContents) tab)
+                .visualCreativeTabEditor$replaceContents(contents.displayItems(), contents.searchItems());
     }
 
     private static Map<Path, String> fullDocuments(CreativeTabCatalog catalog, HolderLookup.Provider lookup) {

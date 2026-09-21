@@ -50,7 +50,8 @@ public final class CreativeTabDraft {
         Objects.requireNonNull(catalog, "catalog");
         int index = 0;
         for (CreativeTabDefinition definition : catalog.orderedDefinitions()) {
-            this.tabs.add(copyDefinition(definition, index++));
+            this.tabs.add(definition.order() == index ? definition : copyDefinition(definition, index));
+            index++;
         }
         this.currentTabId = this.tabs.stream()
                 .filter(definition -> definition.type() == CreativeTabType.CATEGORY && !definition.hidden())
@@ -671,6 +672,44 @@ public final class CreativeTabDraft {
     }
 
     /** Builds an immutable catalog while sharing unchanged immutable definitions. */
+    public void restoreDefaultOrder(CreativeTabCatalog baseline) {
+        CreativeTabDefinition current = requireCurrentTab();
+        if (current.type() == CreativeTabType.CATEGORY) {
+            Map<DefaultOrderKey, Integer> ranks = new HashMap<>();
+            List<ItemStack> original = baseline.definition(current.id()).map(CreativeTabDefinition::items).orElse(List.of());
+            for (int index = 0; index < original.size(); index++) {
+                ranks.putIfAbsent(DefaultOrderKey.of(original.get(index)), index);
+            }
+            sortCurrentItems(Comparator.comparingInt(stack -> ranks.getOrDefault(DefaultOrderKey.of(stack), Integer.MAX_VALUE)));
+        } else if (current.type() == CreativeTabType.SEARCH) {
+            replaceCurrentItems(current, List.of());
+        }
+        this.tabs.sort(Comparator.comparingInt(tab -> baseline.definition(tab.id())
+                .map(CreativeTabDefinition::order).orElse(Integer.MAX_VALUE)));
+        normalizeTabOrders();
+        this.selectedItemIndices.clear();
+        invalidatePreparedSearchItems();
+    }
+
+    private record DefaultOrderKey(Item item, DataComponentMap data) {
+        private static DefaultOrderKey of(ItemStack stack) {
+            return new DefaultOrderKey(stack.getItem(), stack.getComponents());
+        }
+    }
+
+    public boolean matchesCatalog(CreativeTabCatalog catalog) {
+        List<CreativeTabDefinition> definitions = catalog.orderedDefinitions();
+        if (this.tabs.size() != definitions.size()) {
+            return false;
+        }
+        for (int index = 0; index < this.tabs.size(); index++) {
+            if (this.tabs.get(index) != definitions.get(index)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public CreativeTabCatalog toCatalog() {
         return new CreativeTabCatalog(this.tabs);
     }
@@ -1059,9 +1098,9 @@ public final class CreativeTabDraft {
                 definition.id(),
                 definition.format(),
                 definition.title(),
-                normalizeStack(definition.icon()),
-                copyStacks(definition.items()),
-                copyStacks(definition.searchItems()),
+                definition.icon(),
+                definition.items(),
+                definition.searchItems(),
                 definition.hidden(),
                 order,
                 definition.type(),

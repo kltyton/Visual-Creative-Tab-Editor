@@ -21,6 +21,11 @@ public final class VisualCreativeTabEditorForgeClient {
     public static void register() {
         MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditorForgeClient::loggingOut);
         CreativeTabNetworkBridge.installClientSender(VisualCreativeTabEditorForgeNetwork::sendToServer);
+        CreativeTabClientPlatform.installServerCapability(() -> {
+            var connection = net.minecraft.client.Minecraft.getInstance().getConnection();
+            return connection != null && com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorForgeNetwork
+                    .isRemotePresent(connection.getConnection());
+        });
         CreativeTabClientPlatform.preserveNativeTabPositions();
         CreativeTabClientPlatform.installVisibleTabsProvider(screen -> screen.getCurrentPage().getVisibleTabs());
         CreativeTabClientPlatform.installTabRevealer((screen, tab) -> pages(screen).stream()
