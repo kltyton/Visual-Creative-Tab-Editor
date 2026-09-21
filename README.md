@@ -15,6 +15,9 @@ A Fabric and NeoForge mod for visual, data-driven editing of Minecraft creative 
 - 标签标题与图标编辑。
 - 按语义类别、本地化名称、ID 和 Mod ID 整理。
 - 服务端权限校验、修订冲突检测和保存回滚。
+- 撤回上一步 / Ctrl+Z、恢复隐藏栏目、恢复默认排列。
+- 跨存档模板和仅客户端多人服务器布局。
+- 更大目录容量、基岩版风格按钮与无阴影文字。
 
 The current version includes the data-driven catalog, world-local priority packs,
 the unified visual editor, semantic sorting, server validation, conflict handling,
@@ -24,15 +27,15 @@ and native Fabric/NeoForge pagination integration.
 
 | 项目 / Component | 版本 / Version |
 | --- | --- |
-| Mod | `2.0.1-hotfix1` |
-| Minecraft | `26.2` |
+| Mod | `2.1.0` |
+| Minecraft | `26.1.2` |
 | Java | `25+` |
-| Fabric | Loader `0.19.3+` + Fabric API；tested with `0.152.1+26.2` |
-| NeoForge | `26.2.0.1-beta+` |
+| Fabric | Loader `0.19.3+` + Fabric API；tested with `0.155.3+26.1.2` |
+| NeoForge | `26.1.2.109+` |
 
-多人游戏需要客户端和服务端同时安装。Fabric 环境需要 Fabric API。
+多人游戏可仅客户端安装并保存自己的布局；服务端也安装时使用服务端权威共享布局和权限校验。Fabric 环境需要 Fabric API。
 
-Install the mod on both client and server for multiplayer. Fabric also requires Fabric API.
+Client-only multiplayer keeps a local layout per server. Install on both sides for server-authoritative shared layouts and permission checks. Fabric requires Fabric API.
 
 ## Wiki
 
@@ -56,12 +59,12 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 构建产物：
 
 ```text
-fabric/build/libs/visual_creative_tab_editor-fabric-26.2-2.0.1-hotfix1.jar
-neoforge/build/libs/visual_creative_tab_editor-neoforge-26.2-2.0.1-hotfix1.jar
+fabric/build/libs/visual_creative_tab_editor-fabric-26.1.2-2.1.0.jar
+neoforge/build/libs/visual_creative_tab_editor-neoforge-26.1.2-2.1.0.jar
 ```
 
-Minecraft 26.2 使用 Java 25。Gradle toolchain resolver 可以在需要时提供配置的 JDK。
+Minecraft 26.1.2 使用 Java 25。Gradle toolchain resolver 可以在需要时提供配置的 JDK。
 
 ## License
 
-CC0-1.0
+LGPL-3.0-or-later

@@ -18,14 +18,14 @@ public final class PayloadChunks {
     public static final int MAX_CHUNK_BYTES = 24 * 1024;
 
     /** Maximum combined compressed size for one logical payload. */
-    public static final int MAX_COMPRESSED_BYTES = 4 * 1024 * 1024;
+    public static final int MAX_COMPRESSED_BYTES = 16 * 1024 * 1024;
 
     /** Maximum number of chunks that can fit inside the combined compressed limit. */
     public static final int MAX_CHUNKS =
             (MAX_COMPRESSED_BYTES + MAX_CHUNK_BYTES - 1) / MAX_CHUNK_BYTES;
 
     /** Maximum expanded size accepted while decoding GZIP data. */
-    public static final int MAX_UNCOMPRESSED_BYTES = 16 * 1024 * 1024;
+    public static final int MAX_UNCOMPRESSED_BYTES = 128 * 1024 * 1024;
 
     private static final int COPY_BUFFER_BYTES = 8 * 1024;
 

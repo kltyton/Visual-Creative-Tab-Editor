@@ -1,6 +1,6 @@
 # Visual Creative Tab Editor / 可视化创造标签页编辑器
 
-**可视化创造标签页编辑器**（Visual Creative Tab Editor）是一个面向 Minecraft 26.2 的创造标签页编辑 Mod，同时支持 Fabric 与 NeoForge。
+**可视化创造标签页编辑器**（Visual Creative Tab Editor）是一个面向 Minecraft 26.1.2 的创造标签页编辑 Mod，同时支持 Fabric 与 NeoForge。
 
 它把原版及已注册 Mod 的创造标签页投影为可重载的数据目录，并提供类似手机桌面的可视化编辑器。标签页的标题、图标、顺序、可见性和物品列表都可以由世界数据包控制。
 
@@ -10,19 +10,19 @@
 
 | 项目 | 当前支持 |
 | --- | --- |
-| Mod 版本 | `2.0.1-hotfix1` |
-| Minecraft | `26.2` |
-| Fabric | Loader `0.19.3+`，需要 Fabric API；当前使用 `0.152.1+26.2` 构建和验证 |
-| NeoForge | `26.2.0.1-beta+` |
+| Mod 版本 | `2.1.0` |
+| Minecraft | `26.1.2` |
+| Fabric | Loader `0.19.3+`，需要 Fabric API；当前使用 `0.155.3+26.1.2` 构建和验证 |
+| NeoForge | `26.1.2.109+` |
 | Java | `25+` |
-| 安装位置 | 单人游戏安装在客户端；多人游戏需要客户端和服务端同时安装 |
+| 安装位置 | 单人游戏安装在客户端；多人游戏支持仅客户端本地编辑，也支持双端共享编辑 |
 | 配置文件 | 当前没有独立配置文件 |
 
 ## 版本分支
 
 | Minecraft | 分支 | 加载器 | Java |
 | --- | --- | --- | --- |
-| `26.2` | [`26.2`](https://github.com/kltyton/Visual-Creative-Tab-Editor/tree/26.2) | Fabric、NeoForge | `25+` |
+| `26.1.2` | [`26.1.2`](https://github.com/kltyton/Visual-Creative-Tab-Editor/tree/26.1.2) | Fabric、NeoForge | `25+` |
 | `1.21.1` | [`1.21.1`](https://github.com/kltyton/Visual-Creative-Tab-Editor/tree/1.21.1) | Fabric、NeoForge、Forge | `21+` |
 | `1.20.1` | [`1.20.1`](https://github.com/kltyton/Visual-Creative-Tab-Editor/tree/1.20.1) | Fabric、Forge | `17+` |
 

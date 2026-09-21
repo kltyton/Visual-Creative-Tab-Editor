@@ -58,7 +58,7 @@ rebuilt global Search tab while preserving the tab identity.
 ```
 
 `title` uses Minecraft's component JSON. `icon`, `items`, and `search_items` use the
-Minecraft 26.2 `ItemStack` codec, so data components are preserved. Stack counts
+Minecraft 26.1.2 `ItemStack` codec, so data components are preserved. Stack counts
 must be exactly one. For category tabs, `items` is the visible parent-tab list and
 `search_items` is its independent contribution to global search; this preserves
 Minecraft's parent-only and search-only entries.

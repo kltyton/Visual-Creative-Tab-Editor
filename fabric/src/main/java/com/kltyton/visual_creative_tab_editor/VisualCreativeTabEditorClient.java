@@ -15,6 +15,7 @@ import net.fabricmc.fabric.api.client.creativetab.v1.FabricCreativeModeInventory
 public final class VisualCreativeTabEditorClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
+        CreativeTabClientPlatform.installServerCapability(() -> ClientPlayNetworking.canSend(com.kltyton.visual_creative_tab_editor.network.EditChunkPayload.TYPE));
         ClientPlayNetworking.registerGlobalReceiver(
                 SnapshotChunkPayload.TYPE,
                 (payload, context) -> CreativeTabClientState.handleSnapshotChunk(payload)
@@ -46,7 +47,7 @@ public final class VisualCreativeTabEditorClient implements ClientModInitializer
             boolean restored = pageAfterResize == targetPage || fabricScreen.switchToPage(targetPage);
             int pageAfterRestore = fabricScreen.getCurrentPage();
             if (pageAfterResize != targetPage || pageAfterRestore != targetPage) {
-                VisualCreativeTabEditorConstants.LOGGER.info(
+                VisualCreativeTabEditorConstants.LOGGER.debug(
                         "[EditorTrace] fabric-screen-refresh-page-preserve before={} afterResize={} target={} restored={} afterRestore={} pageCount={}",
                         pageBeforeResize,
                         pageAfterResize,
