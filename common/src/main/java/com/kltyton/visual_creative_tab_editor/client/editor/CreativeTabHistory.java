@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** A world's committed edit history, copied into each editing session. */
 public final class CreativeTabHistory {
@@ -28,7 +28,7 @@ public final class CreativeTabHistory {
     private boolean preservePrevious;
     private boolean readable = true;
 
-    public record State(CreativeTabCatalog catalog, Identifier currentTab) { }
+    public record State(CreativeTabCatalog catalog, ResourceLocation currentTab) { }
 
     private CreativeTabHistory(Path file, State anchor) {
         this.file = file;
@@ -192,7 +192,7 @@ public final class CreativeTabHistory {
             List<CreativeTabDefinition> definitions = new ArrayList<>();
             for (var value : tabs) {
                 JsonObject tab = value.getAsJsonObject();
-                Identifier id = Objects.requireNonNull(Identifier.tryParse(tab.get("id").getAsString()));
+                ResourceLocation id = Objects.requireNonNull(ResourceLocation.tryParse(tab.get("id").getAsString()));
                 CreativeTabDefinition definition = base.definition(id).orElse(null);
                 if (tab.has("data")) {
                     CreativeTabPatch patch = CreativeTabJsonCodec.decodePatch(tab.get("data"), registries);
@@ -204,7 +204,7 @@ public final class CreativeTabHistory {
                     throw new IOException("History exceeds retained item capacity");
                 }
             }
-            Identifier selected = entry.has("selected") ? Identifier.tryParse(entry.get("selected").getAsString()) : null;
+            ResourceLocation selected = entry.has("selected") ? ResourceLocation.tryParse(entry.get("selected").getAsString()) : null;
             destination.addLast(new State(new CreativeTabCatalog(definitions), selected));
         }
     }

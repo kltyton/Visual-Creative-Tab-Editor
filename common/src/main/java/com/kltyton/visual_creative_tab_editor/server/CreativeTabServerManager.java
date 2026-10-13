@@ -2,7 +2,10 @@ package com.kltyton.visual_creative_tab_editor.server;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
+// @target if minecraft_version=26.1.2,26.2
+//|import com.google.gson.JsonArray;
+// @target else
+// @target end
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
@@ -18,6 +21,10 @@ import com.kltyton.visual_creative_tab_editor.network.EditResultPayload;
 import com.kltyton.visual_creative_tab_editor.network.PayloadChunks;
 import com.kltyton.visual_creative_tab_editor.network.SnapshotChunkPayload;
 import com.kltyton.visual_creative_tab_editor.pack.PinnedWorldPackSource;
+// @target if minecraft_version=1.20.1
+//|import com.kltyton.visual_creative_tab_editor.platform.CreativeTabNativeBackground;
+// @target else
+// @target end
 import com.kltyton.visual_creative_tab_editor.platform.CreativeTabNativeOrder;
 import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
 import java.io.IOException;
@@ -34,20 +41,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+// @target if minecraft_version=1.20.1
+//|import java.util.Arrays;
+// @target else
+// @target end
 import java.util.Set;
+// @target if minecraft_version=1.20.1
+// @target else
 import java.util.Arrays;
+// @target end
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
+// @target if minecraft_version=26.1.2,26.2
+//|import net.minecraft.server.permissions.Permissions;
+// @target else
+// @target end
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.metadata.pack.PackFormat;
+// @target if minecraft_version=26.1.2,26.2
+//|import net.minecraft.server.packs.metadata.pack.PackFormat;
+// @target else
+// @target end
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.world.item.CreativeModeTab;
@@ -58,6 +78,11 @@ import net.minecraft.world.level.storage.LevelResource;
 
 /** Owns world-pack generation and the server-authoritative resolved catalog. */
 public final class CreativeTabServerManager {
+// @target if minecraft_version=26.1.2,26.2
+// @target else
+    /** Legacy command level matching 26.2's Permissions.COMMANDS_GAMEMASTER. */
+    private static final int GAMEMASTER_PERMISSION_LEVEL = 2;
+// @target end
     private static final Gson PRETTY_GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private static final AtomicLong REVISION = new AtomicLong();
     private static final AtomicLong PACK_MUTATION_EPOCH = new AtomicLong();
@@ -207,7 +232,11 @@ public final class CreativeTabServerManager {
     }
 
     public static void handleEditChunk(ServerPlayer player, EditChunkPayload payload) {
-        if (!player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+// @target if minecraft_version=26.1.2,26.2
+//|        if (!player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+// @target else
+        if (!player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL)) {
+// @target end
             if (payload.index() == 0) {
                 reject(player, payload.sessionId(), "visual_creative_tab_editor.edit.permission_denied");
             }
@@ -221,7 +250,7 @@ public final class CreativeTabServerManager {
             return;
         }
 
-        long now = net.minecraft.util.Util.getMillis();
+        long now = net.minecraft.Util.getMillis();
         PENDING_EDITS.entrySet().removeIf(entry -> now - entry.getValue().createdAt > 30_000L);
         UUID playerId = player.getUUID();
         PendingEdit pending = PENDING_EDITS.get(playerId);
@@ -311,7 +340,11 @@ public final class CreativeTabServerManager {
                     pending.sessionId,
                     true,
                     REVISION.get(),
-                    player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER),
+// @target if minecraft_version=26.1.2,26.2
+//|                    player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER),
+// @target else
+                    player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL),
+// @target end
                     net.minecraft.network.chat.Component.translatable("visual_creative_tab_editor.edit.saved")
             ));
         } catch (Exception exception) {
@@ -349,7 +382,11 @@ public final class CreativeTabServerManager {
         }
         permissionCheckTicks = 0;
         for (ServerPlayer player : target.getPlayerList().getPlayers()) {
-            boolean current = player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+// @target if minecraft_version=26.1.2,26.2
+//|            boolean current = player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+// @target else
+            boolean current = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
+// @target end
             SyncState previous = SYNC_STATE.get(player.getUUID());
             if (previous == null || previous.revision() != REVISION.get() || previous.canEdit() != current) {
                 syncTo(player);
@@ -442,7 +479,11 @@ public final class CreativeTabServerManager {
     }
 
     private static boolean sendSnapshot(ServerPlayer player, SnapshotCache snapshot) {
-        boolean canEdit = player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+// @target if minecraft_version=26.1.2,26.2
+//|        boolean canEdit = player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+// @target else
+        boolean canEdit = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
+// @target end
         for (int index = 0; index < snapshot.chunks().size(); index++) {
             if (!CreativeTabNetworkBridge.sendToPlayer(player, new SnapshotChunkPayload(
                     snapshot.revision(),
@@ -490,13 +531,21 @@ public final class CreativeTabServerManager {
                 sessionId,
                 false,
                 REVISION.get(),
-                player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER),
+// @target if minecraft_version=26.1.2,26.2
+//|                player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER),
+// @target else
+                player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL),
+// @target end
                 net.minecraft.network.chat.Component.translatable(translationKey)
         ));
     }
 
     private static void sendEditResult(ServerPlayer player, EditResultPayload payload) {
-        boolean canEdit = player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+// @target if minecraft_version=26.1.2,26.2
+//|        boolean canEdit = player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+// @target else
+        boolean canEdit = player.hasPermissions(GAMEMASTER_PERMISSION_LEVEL);
+// @target end
         EditResultPayload currentPayload = new EditResultPayload(
                 payload.sessionId(),
                 payload.success(),
@@ -555,7 +604,11 @@ public final class CreativeTabServerManager {
             }
         }
         if (defaultAvailable) {
-            ordered.addFirst(PinnedWorldPackSource.DEFAULT_PACK_ID);
+// @target if minecraft_version=26.1.2,26.2
+//|            ordered.addFirst(PinnedWorldPackSource.DEFAULT_PACK_ID);
+// @target else
+            ordered.add(0, PinnedWorldPackSource.DEFAULT_PACK_ID);
+// @target end
         }
         if (playerAvailable) {
             ordered.add(PinnedWorldPackSource.PLAYER_PACK_ID);
@@ -651,7 +704,7 @@ public final class CreativeTabServerManager {
                     ? CreativeTabPatch.full(targetDefinition)
                     : CreativeTabPatch.diff(baseDefinition, targetDefinition);
             if (!patch.isEmpty()) {
-                Identifier file = CreativeTabJsonCodec.resourceFileFromTabId(targetDefinition.id());
+                ResourceLocation file = CreativeTabJsonCodec.resourceFileFromTabId(targetDefinition.id());
                 Path relative = Path.of("data", file.getNamespace(), file.getPath());
                 documents.put(relative, PRETTY_GSON.toJson(CreativeTabJsonCodec.encodePatch(patch, lookup)) + "\n");
             }
@@ -669,11 +722,18 @@ public final class CreativeTabServerManager {
             List<CreativeModeTab> registryTabs = BuiltInRegistries.CREATIVE_MODE_TAB.stream().toList();
             Map<CreativeModeTab, NativeContents> originalContents = new IdentityHashMap<>();
             for (CreativeModeTab tab : registryTabs) {
+// @target if minecraft_version=1.20.1
+//|                originalContents.put(tab, new NativeContents(
+//|                        copyDistinct(tab.getDisplayItems()),
+//|                        copyDistinct(tab.getSearchTabDisplayItems())
+//|                ));
+// @target else
                 Set<ItemStack> displayItems = ItemStackLinkedSet.createTypeAndComponentsSet();
                 tab.getDisplayItems().forEach(stack -> displayItems.add(stack.copyWithCount(1)));
                 Set<ItemStack> searchItems = ItemStackLinkedSet.createTypeAndComponentsSet();
                 tab.getSearchTabDisplayItems().forEach(stack -> searchItems.add(stack.copyWithCount(1)));
                 originalContents.put(tab, new NativeContents(displayItems, searchItems));
+// @target end
             }
             try {
                 for (CreativeModeTab tab : registryTabs) {
@@ -690,7 +750,7 @@ public final class CreativeTabServerManager {
                 int order = 0;
                 List<CreativeModeTab> nativeOrder = CreativeTabNativeOrder.apply(registryTabs);
                 for (CreativeModeTab tab : nativeOrder) {
-                    Identifier id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+                    ResourceLocation id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
                     if (id == null) {
                         continue;
                     }
@@ -702,6 +762,18 @@ public final class CreativeTabServerManager {
                         List<ItemStack> searchItems = tab.getType() == CreativeModeTab.Type.CATEGORY
                                 ? copyNativeStacks(tab.getSearchTabDisplayItems())
                                 : List.of();
+// @target if minecraft_version=1.20.1
+//|                        ResourceLocation background = CreativeTabNativeBackground.resolve(tab);
+//|                        if (tab.getType() != CreativeModeTab.Type.CATEGORY) {
+//|                            VisualCreativeTabEditorConstants.LOGGER.info(
+//|                                    "Captured native system creative tab id={} type={} background={}",
+//|                                    id,
+//|                                    tab.getType(),
+//|                                    background
+//|                            );
+//|                        }
+// @target else
+// @target end
                         definitions.add(new CreativeTabDefinition(
                                 id,
                                 CreativeTabPatch.CURRENT_FORMAT,
@@ -712,7 +784,16 @@ public final class CreativeTabServerManager {
                                 !tab.shouldDisplay(),
                                 tabOrder,
                                 CreativeTabType.fromVanilla(tab.getType()),
+// @target if minecraft_version=1.20.1
+//|                                new CreativeTabLayout(
+//|                                        tab.canScroll(),
+//|                                        tab.showTitle(),
+//|                                        tab.isAlignedRight(),
+//|                                        background
+//|                                )
+// @target else
                                 new CreativeTabLayout(tab.canScroll(), tab.showTitle(), tab.isAlignedRight(), tab.getBackgroundTexture())
+// @target end
                         ));
                     } catch (RuntimeException | LinkageError exception) {
                         VisualCreativeTabEditorConstants.LOGGER.warn(
@@ -740,7 +821,7 @@ public final class CreativeTabServerManager {
     }
 
     private static ItemStack captureNativeIcon(
-            Identifier id,
+            ResourceLocation id,
             CreativeModeTab tab,
             List<ItemStack> items,
             List<ItemStack> searchItems
@@ -779,7 +860,7 @@ public final class CreativeTabServerManager {
             tab.buildContents(parameters);
         } catch (RuntimeException | LinkageError exception) {
             restoreNativeContents(tab, fallback);
-            Identifier id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+            ResourceLocation id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
             VisualCreativeTabEditorConstants.LOGGER.warn(
                     "Could not rebuild native creative tab id={} type={}; preserving {} display and {} search items",
                     id == null ? "<unregistered>" : id,
@@ -799,7 +880,7 @@ public final class CreativeTabServerManager {
     private static Map<Path, String> fullDocuments(CreativeTabCatalog catalog, HolderLookup.Provider lookup) {
         Map<Path, String> documents = new LinkedHashMap<>();
         for (CreativeTabDefinition definition : catalog.orderedDefinitions()) {
-            Identifier file = CreativeTabJsonCodec.resourceFileFromTabId(definition.id());
+            ResourceLocation file = CreativeTabJsonCodec.resourceFileFromTabId(definition.id());
             Path relative = Path.of("data", file.getNamespace(), file.getPath());
             documents.put(relative, PRETTY_GSON.toJson(CreativeTabJsonCodec.encodeDefinition(definition, lookup)) + "\n");
         }
@@ -906,14 +987,21 @@ public final class CreativeTabServerManager {
     }
 
     private static String packMetadata(String description) {
-        PackFormat format = SharedConstants.getCurrentVersion().packVersion(PackType.SERVER_DATA);
-        JsonArray encodedFormat = new JsonArray();
-        encodedFormat.add(format.major());
-        encodedFormat.add(format.minor());
+// @target if minecraft_version=26.1.2,26.2
+//|        PackFormat format = SharedConstants.getCurrentVersion().packVersion(PackType.SERVER_DATA);
+//|        JsonArray encodedFormat = new JsonArray();
+//|        encodedFormat.add(format.major());
+//|        encodedFormat.add(format.minor());
+// @target else
+// @target end
         JsonObject pack = new JsonObject();
         pack.addProperty("description", description);
-        pack.add("min_format", encodedFormat.deepCopy());
-        pack.add("max_format", encodedFormat.deepCopy());
+// @target if minecraft_version=26.1.2,26.2
+//|        pack.add("min_format", encodedFormat.deepCopy());
+//|        pack.add("max_format", encodedFormat.deepCopy());
+// @target else
+        pack.addProperty("pack_format", SharedConstants.getCurrentVersion().getPackVersion(PackType.SERVER_DATA));
+// @target end
         JsonObject root = new JsonObject();
         root.add("pack", pack);
         return PRETTY_GSON.toJson(root) + "\n";
@@ -963,7 +1051,19 @@ public final class CreativeTabServerManager {
         }
     }
 
+// @target if minecraft_version=1.20.1
+//|    private static List<ItemStack> copyDistinct(Collection<ItemStack> source) {
+//|        Set<ItemStack> result = ItemStackLinkedSet.createTypeAndTagSet();
+//|        for (ItemStack stack : source) {
+//|            result.add(stack.copyWithCount(1));
+//|        }
+//|        return List.copyOf(result);
+//|    }
+//|
+//|    private record NativeContents(Collection<ItemStack> displayItems, Collection<ItemStack> searchItems) {
+// @target else
     private record NativeContents(Collection<ItemStack> displayItems, Set<ItemStack> searchItems) {
+// @target end
     }
 
     private record SnapshotCache(long revision, int uncompressedSize, List<byte[]> chunks) {

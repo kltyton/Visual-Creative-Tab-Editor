@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "mixinPriority": 2000,
+  "minVersion": "0.8",
+  "package": "com.kltyton.visual_creative_tab_editor.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CreativeModeTabMixin",
+    "CreativeModeTabsMixin",
+    "PackRepositoryMixin",
+    "ServerPacksSourceMixin"
+  ],
+  "client": [
+    "client.ScreenEditorOverlayMixin",
+    "client.AbstractContainerScreenTooltipMixin",
+    "client.CreativeModeInventoryScreenEditorMixin",
+    "client.CreativeModeItemPickerMenuVirtualTailMixin"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

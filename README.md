@@ -50,20 +50,32 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 ## 构建 / Build
 
 ```powershell
-.\gradlew.bat :neoforge:runData
-.\gradlew.bat build
-.\gradlew.bat :fabric:runClient
-.\gradlew.bat :neoforge:runClient
+.\gradlew.bat listTargets
+.\gradlew.bat build_neoforge_1_21_1
+.\gradlew.bat buildAllTargets
+.\gradlew.bat runClient_neoforge_1_21_1
 ```
 
 构建产物：
 
 ```text
-fabric/build/libs/visual_creative_tab_editor-fabric-26.2-2.1.0.jar
-neoforge/build/libs/visual_creative_tab_editor-neoforge-26.2-2.1.0.jar
+targets/fabric-26.2/build/libs/visual_creative_tab_editor-fabric-26.2-2.1.1.jar
+targets/neoforge-26.2/build/libs/visual_creative_tab_editor-neoforge-26.2-2.1.1.jar
 ```
 
-Minecraft 26.2 使用 Java 25。Gradle toolchain resolver 可以在需要时提供配置的 JDK。
+工程使用 [KltytonTemple](https://github.com/kltyton/KltytonTemple) 的独立目标入口。`select_<loader>_<version>` 设置根 `build`、`runClient` 的默认目标；`buildAllTargets` 构建全部九个目标。IDEA 将各目标独立关联，每个目标使用自己的 Wrapper 和 Java。
+
+Minecraft 1.20.1 使用 Java 17，1.21.1 使用 Java 21，26.1.2／26.2 使用 Java 25。Fabric 支持这四个版本；Forge 支持 1.20.1／1.21.1；NeoForge 支持 1.21.1／26.1.2／26.2。
+
+```mermaid
+flowchart LR
+    C[common: 共享逻辑] --> P[prepareSharedJava: 选择原生 API 片段]
+    V[versions: 版本资源和专用类型] --> P
+    L[loaders: 初始化和网络注册] --> P
+    P --> T[targets: 独立编译与发行包]
+```
+
+手写源码维护在 `common`、`versions` 和 `loaders`；`// @target` 标记只选择实际存在的版本或加载器差异。共享源码经 `prepareSharedJava` 写入目标的 `build/generated/sources/shared`，编译和源码包任务依赖这个生产者。26.x 的原生类型改名在该步骤完成，生成结果不手改。手写资源仍由原来的 JSON、AT、AW／ClassTweaker 和 Mixin 配置维护。
 
 ## License
 

@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "mixinPriority": 2000,
+  "minVersion": "0.8",
+  "package": "com.kltyton.visual_creative_tab_editor.mixin.fabric",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [],
+  "client": [
+    "FabricCreativeModeInventoryScreenMixin",
+    "FabricCreativeModeTabsMixin"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

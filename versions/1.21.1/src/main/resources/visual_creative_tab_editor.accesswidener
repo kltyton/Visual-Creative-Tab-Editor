@@ -1,0 +1,25 @@
+accessWidener v2 named
+
+# Creative inventory editor state and helpers.
+# Call sites: CreativeModeInventoryScreenEditorMixin and CreativeTabEditorController.
+accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectedTab Lnet/minecraft/world/item/CreativeModeTab;
+accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen scrollOffs F
+accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen destroyItemSlot Lnet/minecraft/world/inventory/Slot;
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectTab (Lnet/minecraft/world/item/CreativeModeTab;)V
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen getTabX (Lnet/minecraft/world/item/CreativeModeTab;)I
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen getTabY (Lnet/minecraft/world/item/CreativeModeTab;)I
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen isCreativeSlot (Lnet/minecraft/world/inventory/Slot;)Z
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$ItemPickerMenu getRowIndexForScroll (F)I
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$ItemPickerMenu getScrollForRowIndex (I)F
+
+# Data-driven pagination rewrites tab coordinates after loader validation.
+accessible field net/minecraft/world/item/CreativeModeTab row Lnet/minecraft/world/item/CreativeModeTab$Row;
+mutable field net/minecraft/world/item/CreativeModeTab row Lnet/minecraft/world/item/CreativeModeTab$Row;
+accessible field net/minecraft/world/item/CreativeModeTab column I
+mutable field net/minecraft/world/item/CreativeModeTab column I
+
+# Preview changes invalidate vanilla's creative contents cache before the next client tick rebuild.
+accessible field net/minecraft/world/item/CreativeModeTabs CACHED_PARAMETERS Lnet/minecraft/world/item/CreativeModeTab$ItemDisplayParameters;
+
+# ServerPacksSource has no public way to preserve its existing repository sources while adding the pinned source.
+accessible field net/minecraft/server/packs/repository/PackRepository sources Ljava/util/Set;

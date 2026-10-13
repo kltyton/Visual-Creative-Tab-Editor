@@ -6,9 +6,13 @@ import com.kltyton.visual_creative_tab_editor.data.CreativeTabLayout;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabPatch;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabValidation;
+// @target if minecraft_version=1.20.1
+//|import net.minecraft.nbt.CompoundTag;
+// @target else
 import net.minecraft.core.component.DataComponentMap;
+// @target end
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackLinkedSet;
@@ -36,11 +40,15 @@ public final class CreativeTabDraft {
     public static final String CUSTOM_NAMESPACE = "visual_creative_tab_editor";
 
     private final List<CreativeTabDefinition> tabs = new ArrayList<>();
-    private final LinkedHashSet<Identifier> selectedTabIds = new LinkedHashSet<>();
+    private final LinkedHashSet<ResourceLocation> selectedTabIds = new LinkedHashSet<>();
     private final NavigableSet<Integer> selectedItemIndices = new TreeSet<>();
     private final List<ItemStack> currentSearchItems = new ArrayList<>();
+// @target if minecraft_version=1.20.1
+//|    private final Map<Item, Map<CompoundTag, Integer>> currentSearchItemIndices = new HashMap<>();
+// @target else
     private final Map<Item, Map<DataComponentMap, Integer>> currentSearchItemIndices = new HashMap<>();
-    private Identifier currentTabId;
+// @target end
+    private ResourceLocation currentTabId;
     private CreativeTabType currentTabType = CreativeTabType.CATEGORY;
     private int currentSearchPreferenceCapacity;
     private boolean currentSearchItemsPrepared;
@@ -57,7 +65,7 @@ public final class CreativeTabDraft {
                 .filter(definition -> definition.type() == CreativeTabType.CATEGORY && !definition.hidden())
                 .map(CreativeTabDefinition::id)
                 .findFirst()
-                .orElseGet(() -> this.tabs.isEmpty() ? null : this.tabs.getFirst().id());
+                .orElseGet(() -> this.tabs.isEmpty() ? null : this.tabs.get(0).id());
         if (this.currentTabId != null) {
             this.currentTabType = this.tabs.get(requireTabIndex(this.currentTabId)).type();
         }
@@ -77,12 +85,12 @@ public final class CreativeTabDraft {
         return this.tabs.size();
     }
 
-    public Optional<CreativeTabDefinition> definition(Identifier id) {
+    public Optional<CreativeTabDefinition> definition(ResourceLocation id) {
         int index = indexOf(requireId(id));
         return index < 0 ? Optional.empty() : Optional.of(this.tabs.get(index));
     }
 
-    public Optional<Identifier> currentTabId() {
+    public Optional<ResourceLocation> currentTabId() {
         return Optional.ofNullable(this.currentTabId);
     }
 
@@ -96,20 +104,20 @@ public final class CreativeTabDraft {
     }
 
     /** Changes the item-editing target and clears index-based item selection. */
-    public void setCurrentTab(Identifier id) {
+    public void setCurrentTab(ResourceLocation id) {
         switchCurrentTab(requireExistingId(id));
     }
 
-    public Set<Identifier> selectedTabIds() {
+    public Set<ResourceLocation> selectedTabIds() {
         return Collections.unmodifiableSet(new LinkedHashSet<>(this.selectedTabIds));
     }
 
-    public boolean isTabSelected(Identifier id) {
+    public boolean isTabSelected(ResourceLocation id) {
         return this.selectedTabIds.contains(requireId(id));
     }
 
-    public void setTabSelected(Identifier id, boolean selected) {
-        Identifier checked = requireExistingId(id);
+    public void setTabSelected(ResourceLocation id, boolean selected) {
+        ResourceLocation checked = requireExistingId(id);
         if (selected) {
             this.selectedTabIds.add(checked);
         } else {
@@ -118,8 +126,8 @@ public final class CreativeTabDraft {
     }
 
     /** Toggles an id-based tab selection and returns its new state. */
-    public boolean toggleTabSelection(Identifier id) {
-        Identifier checked = requireExistingId(id);
+    public boolean toggleTabSelection(ResourceLocation id) {
+        ResourceLocation checked = requireExistingId(id);
         if (this.selectedTabIds.remove(checked)) {
             return false;
         }
@@ -140,10 +148,10 @@ public final class CreativeTabDraft {
     }
 
     /** Moves the supplied tab ids as one block while preserving their old order. */
-    public void moveTabs(Collection<Identifier> ids, int targetIndex) {
+    public void moveTabs(Collection<ResourceLocation> ids, int targetIndex) {
         Objects.requireNonNull(ids, "ids");
         checkInsertionIndex(targetIndex, this.tabs.size(), "tab target index");
-        Set<Identifier> movingIds = checkedIds(ids);
+        Set<ResourceLocation> movingIds = checkedIds(ids);
         if (movingIds.isEmpty()) {
             return;
         }
@@ -187,8 +195,8 @@ public final class CreativeTabDraft {
         setTabsHidden(this.selectedTabIds, hidden);
     }
 
-    public void setTabsHidden(Collection<Identifier> ids, boolean hidden) {
-        Set<Identifier> checked = checkedIds(ids);
+    public void setTabsHidden(Collection<ResourceLocation> ids, boolean hidden) {
+        Set<ResourceLocation> checked = checkedIds(ids);
         boolean changed = false;
         for (int index = 0; index < this.tabs.size(); index++) {
             CreativeTabDefinition definition = this.tabs.get(index);
@@ -247,7 +255,11 @@ public final class CreativeTabDraft {
         if (definition.type() == CreativeTabType.SEARCH && this.currentSearchItemsPrepared) {
             for (int index = 0; index < this.currentSearchItems.size(); index++) {
                 if (index != excludedIndex
+// @target if minecraft_version=1.20.1
+//|                        && ItemStack.isSameItemSameTags(this.currentSearchItems.get(index), target)) {
+// @target else
                         && ItemStack.isSameItemSameComponents(this.currentSearchItems.get(index), target)) {
+// @target end
                     return index;
                 }
             }
@@ -309,9 +321,9 @@ public final class CreativeTabDraft {
      * @return the number of items moved, or {@code -1} when the target tab
      *         cannot accept the block without exceeding a per-list limit
      */
-    public int moveSelectedItemsToTab(Identifier targetTabId) {
+    public int moveSelectedItemsToTab(ResourceLocation targetTabId) {
         CreativeTabDefinition source = requireEditableCategory();
-        Identifier checkedTargetId = requireExistingId(targetTabId);
+        ResourceLocation checkedTargetId = requireExistingId(targetTabId);
         if (source.id().equals(checkedTargetId)) {
             return 0;
         }
@@ -611,8 +623,13 @@ public final class CreativeTabDraft {
         if (!this.currentSearchItemsPrepared || stack == null || stack.isEmpty() || maxExclusive <= 0) {
             return -1;
         }
+// @target if minecraft_version=1.20.1
+//|        Map<CompoundTag, Integer> byTag = this.currentSearchItemIndices.get(stack.getItem());
+//|        Integer index = byTag == null ? null : byTag.get(stack.getTag());
+// @target else
         Map<DataComponentMap, Integer> byComponents = this.currentSearchItemIndices.get(stack.getItem());
         Integer index = byComponents == null ? null : byComponents.get(stack.getComponents());
+// @target end
         int limit = Math.min(maxExclusive, this.currentSearchPreferenceCapacity);
         return index != null && index < limit ? index : -1;
     }
@@ -621,7 +638,7 @@ public final class CreativeTabDraft {
         setTabIcon(requireCurrentTab().id(), icon);
     }
 
-    public void setTabIcon(Identifier id, ItemStack icon) {
+    public void setTabIcon(ResourceLocation id, ItemStack icon) {
         int index = requireTabIndex(id);
         CreativeTabDefinition definition = this.tabs.get(index);
         this.tabs.set(index, withIcon(definition, normalizeStack(icon)));
@@ -632,7 +649,7 @@ public final class CreativeTabDraft {
     }
 
     /** Stores user-entered titles as literal components. */
-    public void setTabTitle(Identifier id, String title) {
+    public void setTabTitle(ResourceLocation id, String title) {
         int index = requireTabIndex(id);
         CreativeTabDefinition definition = this.tabs.get(index);
         this.tabs.set(index, withTitle(definition, Component.literal(Objects.requireNonNull(title, "title"))));
@@ -642,16 +659,20 @@ public final class CreativeTabDraft {
      * Adds an empty category whose icon and default literal title come from the
      * selected inventory stack. The generated id is always unique in this draft.
      */
-    public Identifier addCustomCategory(ItemStack selectedStack) {
+    public ResourceLocation addCustomCategory(ItemStack selectedStack) {
         ItemStack icon = normalizeStack(selectedStack);
         return addCustomCategory(icon, icon.getHoverName().getString());
     }
 
-    public Identifier addCustomCategory(ItemStack selectedStack, String title) {
+    public ResourceLocation addCustomCategory(ItemStack selectedStack, String title) {
         ItemStack icon = normalizeStack(selectedStack);
-        Identifier id;
+        ResourceLocation id;
         do {
-            id = Identifier.fromNamespaceAndPath(CUSTOM_NAMESPACE, "custom/" + UUID.randomUUID());
+// @target if minecraft_version=1.20.1
+//|            id = new ResourceLocation(CUSTOM_NAMESPACE, "custom/" + UUID.randomUUID());
+// @target else
+            id = ResourceLocation.fromNamespaceAndPath(CUSTOM_NAMESPACE, "custom/" + UUID.randomUUID());
+// @target end
         } while (indexOf(id) >= 0);
 
         CreativeTabDefinition definition = new CreativeTabDefinition(
@@ -691,9 +712,17 @@ public final class CreativeTabDraft {
         invalidatePreparedSearchItems();
     }
 
+// @target if minecraft_version=1.20.1
+//|    private record DefaultOrderKey(Item item, net.minecraft.nbt.CompoundTag data) {
+// @target else
     private record DefaultOrderKey(Item item, DataComponentMap data) {
+// @target end
         private static DefaultOrderKey of(ItemStack stack) {
+// @target if minecraft_version=1.20.1
+//|            return new DefaultOrderKey(stack.getItem(), stack.getTag());
+// @target else
             return new DefaultOrderKey(stack.getItem(), stack.getComponents());
+// @target end
         }
     }
 
@@ -796,7 +825,11 @@ public final class CreativeTabDraft {
             CreativeTabDefinition definition,
             List<ItemStack> visibleItems
     ) {
+// @target if minecraft_version=1.20.1
+//|        Set<ItemStack> visible = ItemStackLinkedSet.createTypeAndTagSet();
+// @target else
         Set<ItemStack> visible = ItemStackLinkedSet.createTypeAndComponentsSet();
+// @target end
         visible.addAll(visibleItems);
         List<IndexedSearchPreference> invisible = new ArrayList<>();
         int preferenceCount = definition.itemCount();
@@ -818,7 +851,15 @@ public final class CreativeTabDraft {
             }
         }
         long globalCapacity = CreativeTabValidation.MAX_TOTAL_ITEMS - otherItems;
+// @target if minecraft_version=1.20.1
+//|        long boundedCapacity = Math.max(0L, Math.min(
+//|                globalCapacity,
+//|                (long) CreativeTabValidation.MAX_ITEMS_PER_TAB
+//|        ));
+//|        return (int) boundedCapacity;
+// @target else
         return (int) Math.clamp(globalCapacity, 0L, CreativeTabValidation.MAX_ITEMS_PER_TAB);
+// @target end
     }
 
     private void replacePreparedSearchItems(Collection<ItemStack> stacks) {
@@ -826,11 +867,21 @@ public final class CreativeTabDraft {
         this.currentSearchItemIndices.clear();
         for (ItemStack stack : stacks) {
             ItemStack normalized = normalizeStack(stack);
+// @target if minecraft_version=1.20.1
+//|            Map<CompoundTag, Integer> byTag = this.currentSearchItemIndices.computeIfAbsent(
+// @target else
             Map<DataComponentMap, Integer> byComponents = this.currentSearchItemIndices.computeIfAbsent(
+// @target end
                     normalized.getItem(),
                     ignored -> new HashMap<>()
             );
+// @target if minecraft_version=1.20.1
+//|            CompoundTag tag = normalized.getTag();
+//|            CompoundTag key = tag == null ? null : tag.copy();
+//|            if (byTag.putIfAbsent(key, this.currentSearchItems.size()) == null) {
+// @target else
             if (byComponents.putIfAbsent(normalized.getComponents(), this.currentSearchItems.size()) == null) {
+// @target end
                 this.currentSearchItems.add(normalized);
             }
         }
@@ -848,7 +899,7 @@ public final class CreativeTabDraft {
         this.currentSearchItemsPrepared = false;
     }
 
-    private void switchCurrentTab(Identifier id) {
+    private void switchCurrentTab(ResourceLocation id) {
         if (id.equals(this.currentTabId)) {
             return;
         }
@@ -863,7 +914,11 @@ public final class CreativeTabDraft {
             return false;
         }
         for (int index = 0; index < left.size(); index++) {
+// @target if minecraft_version=1.20.1
+//|            if (!ItemStack.isSameItemSameTags(left.get(index), right.get(index))) {
+// @target else
             if (!ItemStack.isSameItemSameComponents(left.get(index), right.get(index))) {
+// @target end
                 return false;
             }
         }
@@ -916,7 +971,11 @@ public final class CreativeTabDraft {
         for (int index = 0; index < uniqueSearchItems.size(); index++) {
             ItemStack searchItem = uniqueSearchItems.get(index);
             if (matchesAny(searchItem, replaced)
+// @target if minecraft_version=1.20.1
+//|                    || ItemStack.isSameItemSameTags(searchItem, normalized)) {
+// @target else
                     || ItemStack.isSameItemSameComponents(searchItem, normalized)) {
+// @target end
                 if (index < anchor) {
                     removedBeforeAnchor++;
                 }
@@ -954,7 +1013,11 @@ public final class CreativeTabDraft {
 
     private static boolean matchesAny(ItemStack stack, Collection<ItemStack> candidates) {
         for (ItemStack candidate : candidates) {
+// @target if minecraft_version=1.20.1
+//|            if (ItemStack.isSameItemSameTags(stack, candidate)) {
+// @target else
             if (ItemStack.isSameItemSameComponents(stack, candidate)) {
+// @target end
                 return true;
             }
         }
@@ -976,7 +1039,11 @@ public final class CreativeTabDraft {
 
     private static int indexOfMatching(List<ItemStack> stacks, ItemStack target, int excludedIndex) {
         for (int index = 0; index < stacks.size(); index++) {
+// @target if minecraft_version=1.20.1
+//|            if (index != excludedIndex && ItemStack.isSameItemSameTags(stacks.get(index), target)) {
+// @target else
             if (index != excludedIndex && ItemStack.isSameItemSameComponents(stacks.get(index), target)) {
+// @target end
                 return index;
             }
         }
@@ -985,7 +1052,11 @@ public final class CreativeTabDraft {
 
     private static boolean removeFirstMatching(List<ItemStack> candidates, ItemStack stack) {
         for (int index = 0; index < candidates.size(); index++) {
+// @target if minecraft_version=1.20.1
+//|            if (ItemStack.isSameItemSameTags(candidates.get(index), stack)) {
+// @target else
             if (ItemStack.isSameItemSameComponents(candidates.get(index), stack)) {
+// @target end
                 candidates.remove(index);
                 return true;
             }
@@ -1000,9 +1071,9 @@ public final class CreativeTabDraft {
         }
     }
 
-    private Set<Identifier> checkedIds(Collection<Identifier> ids) {
-        LinkedHashSet<Identifier> checked = new LinkedHashSet<>();
-        for (Identifier id : ids) {
+    private Set<ResourceLocation> checkedIds(Collection<ResourceLocation> ids) {
+        LinkedHashSet<ResourceLocation> checked = new LinkedHashSet<>();
+        for (ResourceLocation id : ids) {
             checked.add(requireExistingId(id));
         }
         return checked;
@@ -1018,16 +1089,16 @@ public final class CreativeTabDraft {
         return checked;
     }
 
-    private Identifier requireExistingId(Identifier id) {
-        Identifier checked = requireId(id);
+    private ResourceLocation requireExistingId(ResourceLocation id) {
+        ResourceLocation checked = requireId(id);
         if (indexOf(checked) < 0) {
             throw new IllegalArgumentException("Unknown creative tab id: " + checked);
         }
         return checked;
     }
 
-    private int requireTabIndex(Identifier id) {
-        Identifier checked = requireId(id);
+    private int requireTabIndex(ResourceLocation id) {
+        ResourceLocation checked = requireId(id);
         int index = indexOf(checked);
         if (index < 0) {
             throw new IllegalArgumentException("Unknown creative tab id: " + checked);
@@ -1035,7 +1106,7 @@ public final class CreativeTabDraft {
         return index;
     }
 
-    private int indexOf(Identifier id) {
+    private int indexOf(ResourceLocation id) {
         for (int index = 0; index < this.tabs.size(); index++) {
             if (this.tabs.get(index).id().equals(id)) {
                 return index;
@@ -1054,7 +1125,7 @@ public final class CreativeTabDraft {
         }
     }
 
-    private static Identifier requireId(Identifier id) {
+    private static ResourceLocation requireId(ResourceLocation id) {
         return Objects.requireNonNull(id, "id");
     }
 
@@ -1080,7 +1151,11 @@ public final class CreativeTabDraft {
 
     private static List<ItemStack> copyStacks(List<ItemStack> stacks) {
         List<ItemStack> copies = new ArrayList<>(stacks.size());
+// @target if minecraft_version=1.20.1
+//|        Set<ItemStack> unique = ItemStackLinkedSet.createTypeAndTagSet();
+// @target else
         Set<ItemStack> unique = ItemStackLinkedSet.createTypeAndComponentsSet();
+// @target end
         for (ItemStack stack : stacks) {
             ItemStack copy = normalizeStack(stack);
             if (unique.add(copy)) {

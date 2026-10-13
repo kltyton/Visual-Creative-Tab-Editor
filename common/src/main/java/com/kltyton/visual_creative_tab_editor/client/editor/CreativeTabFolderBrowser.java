@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -100,7 +100,11 @@ public final class CreativeTabFolderBrowser {
                 ItemEntry item = row.items.get(column);
                 var menu = this.host.visualCreativeTabEditor$menu();
                 if (this.host.visualCreativeTabEditor$selectedTab() != this.sourceTab || item.index >= menu.items.size()
+// @target if minecraft_version=1.20.1
+//|                        || !ItemStack.isSameItemSameTags(item.stack, menu.items.get(item.index))) {
+// @target else
                         || !ItemStack.isSameItemSameComponents(item.stack, menu.items.get(item.index))) {
+// @target end
                     open(Kind.ITEMS);
                     return true;
                 }
@@ -167,7 +171,7 @@ public final class CreativeTabFolderBrowser {
         this.scroll = Math.min(this.scroll, Math.max(0, this.rows.size() - visibleRows(panel())));
     }
 
-    public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY) {
         if (!isOpen()) {
             button(graphics, launcher(0), Component.translatable("visual_creative_tab_editor.folders.tabs"), mouseX, mouseY, false);
             if (canBrowseItems()) {
@@ -175,7 +179,12 @@ public final class CreativeTabFolderBrowser {
             }
             return;
         }
-        graphics.nextStratum();
+// @target if minecraft_version=26.1.2,26.2
+//|        graphics.nextStratum();
+// @target else
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 400);
+// @target end
         Bounds panel = panel();
         int currentColumns = Math.max(1, (panel.width - 40) / 20);
         if (currentColumns != this.columns) {
@@ -184,7 +193,7 @@ public final class CreativeTabFolderBrowser {
         }
         graphics.fill(0, 0, this.host.visualCreativeTabEditor$screenWidth(), this.host.visualCreativeTabEditor$screenHeight(), 0xB0000000);
         graphics.fill(panel.x, panel.y, panel.x + panel.width, panel.y + panel.height, 0xFF252525);
-        graphics.outline(panel.x, panel.y, panel.width, panel.height, 0xFFC6C6C6);
+        graphics.renderOutline(panel.x, panel.y, panel.width, panel.height, 0xFFC6C6C6);
         text(graphics, Component.translatable(this.kind == Kind.TABS ? "visual_creative_tab_editor.folders.tabs" : "visual_creative_tab_editor.folders.items"), panel.x + 8, panel.y + 8, 0xFFFFFFFF, panel.width - 70);
         button(graphics, closeButton(panel), Component.literal("X"), mouseX, mouseY, false);
         String[] filters = {"all", "vanilla", "mods"};
@@ -208,19 +217,19 @@ public final class CreativeTabFolderBrowser {
                 text(graphics, Component.literal(label), panel.x + 42, y + 5, hidden ? 0xFFAAAAAA : 0xFFFFFFFF, panel.width - 82);
                 text(graphics, Component.literal(hidden ? "[ ]" : "[x]"), panel.x + panel.width - 33, y + 5, 0xFFFFFFFF, 22);
             } else if (row.tab != null) {
-                graphics.item(row.tab.getIconItem(), panel.x + 24, y + 1);
+                graphics.renderItem(row.tab.getIconItem(), panel.x + 24, y + 1);
                 text(graphics, row.tab.getDisplayName(), panel.x + 44, y + 5, 0xFFFFFFFF, panel.width - 60);
                 if (mouseY >= y && mouseY < y + 20 && mouseX >= panel.x + 18 && mouseX < panel.x + panel.width - 14) {
-                    graphics.outline(panel.x + 18, y, panel.width - 32, 19, 0xFFFFFFFF);
+                    graphics.renderOutline(panel.x + 18, y, panel.width - 32, 19, 0xFFFFFFFF);
                     hint = row.tab.getDisplayName();
                 }
             } else {
                 for (int column = 0; column < row.items.size(); column++) {
                     int x = panel.x + 18 + column * 20;
                     graphics.fill(x, y, x + 18, y + 18, 0xFF666666);
-                    graphics.item(row.items.get(column).stack, x + 1, y + 1);
+                    graphics.renderItem(row.items.get(column).stack, x + 1, y + 1);
                     if (mouseX >= x && mouseX < x + 20 && mouseY >= y && mouseY < y + 20) {
-                        graphics.outline(x, y, 18, 18, 0xFFFFFFFF);
+                        graphics.renderOutline(x, y, 18, 18, 0xFFFFFFFF);
                         hint = row.items.get(column).stack.getHoverName();
                     }
                 }
@@ -236,21 +245,25 @@ public final class CreativeTabFolderBrowser {
             graphics.fill(panel.x + panel.width - 8, top, panel.x + panel.width - 4, top + thumb, 0xFFC6C6C6);
         }
         text(graphics, hint, panel.x + 8, panel.y + panel.height - 15, 0xFFEEEEEE, panel.width - 16);
+// @target if minecraft_version=26.1.2,26.2
+// @target else
+        graphics.pose().popPose();
+// @target end
     }
 
-    private void button(GuiGraphicsExtractor graphics, Bounds box, Component label, int mouseX, int mouseY, boolean selected) {
+    private void button(GuiGraphics graphics, Bounds box, Component label, int mouseX, int mouseY, boolean selected) {
         int face = selected ? 0xFF3C8527 : box.contains(mouseX, mouseY) ? 0xFFE0E0E0 : 0xFFC6C6C6;
         graphics.fill(box.x, box.y, box.x + box.width, box.y + box.height, 0xFF222222);
         graphics.fill(box.x + 1, box.y + 1, box.x + box.width - 1, box.y + box.height - 3, face);
         graphics.fill(box.x + 1, box.y + 1, box.x + box.width - 1, box.y + 2, 0xFFEEEEEE);
         String clipped = this.host.visualCreativeTabEditor$font().plainSubstrByWidth(label.getString(), box.width - 6);
-        graphics.text(this.host.visualCreativeTabEditor$font(), clipped,
+        graphics.drawString(this.host.visualCreativeTabEditor$font(), clipped,
                 box.x + (box.width - this.host.visualCreativeTabEditor$font().width(clipped)) / 2, box.y + 5,
                 selected ? 0xFFFFFFFF : 0xFF202020, false);
     }
 
-    private void text(GuiGraphicsExtractor graphics, Component label, int x, int y, int color, int width) {
-        graphics.text(this.host.visualCreativeTabEditor$font(), this.host.visualCreativeTabEditor$font().plainSubstrByWidth(label.getString(), Math.max(0, width)), x, y, color, false);
+    private void text(GuiGraphics graphics, Component label, int x, int y, int color, int width) {
+        graphics.drawString(this.host.visualCreativeTabEditor$font(), this.host.visualCreativeTabEditor$font().plainSubstrByWidth(label.getString(), Math.max(0, width)), x, y, color, false);
     }
 
     private Bounds launcher(int row) {

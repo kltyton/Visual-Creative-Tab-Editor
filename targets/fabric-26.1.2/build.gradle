@@ -1,0 +1,55 @@
+plugins {
+    id 'java-library'
+    id 'me.modmuss50.mod-publish-plugin' version '2.1.1'
+    id 'net.fabricmc.fabric-loom' version '1.16.3'
+}
+apply from: file('../../gradle/target-conventions/base.gradle')
+apply from: file('../../gradle/target-conventions/shared-java.gradle')
+
+dependencies {
+    minecraft("com.mojang:minecraft:${minecraft_version}")
+    implementation("net.fabricmc:fabric-loader:${fabric_loader_version}")
+    implementation("net.fabricmc.fabric-api:fabric-api:${fabric_version}")
+}
+
+loom {
+    def classTweaker = file("../../versions/26.1.2/" + "src/main/resources/${mod_id}.classtweaker")
+    if (classTweaker.exists()) {
+        accessWidenerPath.set(classTweaker)
+    }
+    runs {
+        client {
+            client()
+            setConfigName('Fabric Client')
+            ideConfigGenerated(true)
+            runDir('runs/client')
+        }
+        server {
+            server()
+            setConfigName('Fabric Server')
+            ideConfigGenerated(true)
+            runDir('runs/server')
+        }
+    }
+}
+
+// Implement mcgradleconventions loader attribute
+def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
+['apiElements', 'runtimeElements', 'sourcesElements', 'javadocElements', 'includeInternal', 'modCompileClasspath'].each { variant ->
+    configurations.named(variant) {
+        attributes {
+            attribute(loaderAttribute, 'fabric')
+        }
+    }
+}
+sourceSets.configureEach {
+    [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName].each { variant->
+        configurations.named(variant) {
+            attributes {
+                attribute(loaderAttribute, 'fabric')
+            }
+        }
+    }
+}
+
+apply from: file('../../gradle/target-conventions/publish.gradle')

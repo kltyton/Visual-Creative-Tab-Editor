@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Wire/storage codec for a complete resolved creative-tab catalog. */
 public final class CreativeTabCatalogJson {
@@ -61,7 +61,7 @@ public final class CreativeTabCatalogJson {
             if (!entry.has("id") || !entry.has("data") || entry.size() != 2) {
                 throw new JsonParseException("tabs[" + index + "] requires exactly id and data");
             }
-            Identifier id = Identifier.tryParse(entry.get("id").getAsString());
+            ResourceLocation id = ResourceLocation.tryParse(entry.get("id").getAsString());
             if (id == null) {
                 throw new JsonParseException("Invalid tab id at tabs[" + index + "]");
             }

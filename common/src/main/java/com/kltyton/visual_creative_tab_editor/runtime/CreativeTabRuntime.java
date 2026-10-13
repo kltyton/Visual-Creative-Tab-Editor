@@ -4,6 +4,10 @@ import com.kltyton.visual_creative_tab_editor.data.CreativeTabCatalog;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabDefinition;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
 import java.util.ArrayList;
+// @target if minecraft_version=1.20.1
+//|import java.util.Collections;
+// @target else
+// @target end
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.HashSet;
@@ -13,13 +17,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Set;
+// @target if minecraft_version=1.20.1
+// @target else
 import net.minecraft.core.component.DataComponentMap;
+// @target end
 import net.minecraft.world.item.Item;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
@@ -27,7 +34,7 @@ import net.minecraft.world.item.ItemStack;
 /** Thread-safe runtime projection of the current server-authoritative tab catalog. */
 public final class CreativeTabRuntime {
     private static final AtomicReference<State> ACTIVE = new AtomicReference<>(State.empty());
-    private static final AtomicReference<Map<Identifier, CreativeModeTab>> PREVIEW_HANDOFF = new AtomicReference<>();
+    private static final AtomicReference<Map<ResourceLocation, CreativeModeTab>> PREVIEW_HANDOFF = new AtomicReference<>();
     private static final ThreadLocal<State> PREVIEW = new ThreadLocal<>();
     private static final ThreadLocal<Integer> NATIVE_BYPASS = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<CreativeModeTab> FORCED_VISIBLE_TAB = new ThreadLocal<>();
@@ -37,7 +44,7 @@ public final class CreativeTabRuntime {
     }
 
     public static void install(CreativeTabCatalog catalog) {
-        Map<Identifier, CreativeModeTab> handoff = PREVIEW_HANDOFF.getAndSet(null);
+        Map<ResourceLocation, CreativeModeTab> handoff = PREVIEW_HANDOFF.getAndSet(null);
         ACTIVE.updateAndGet(previous -> State.create(catalog, previous, handoff));
         CreativeModeTabs.CACHED_PARAMETERS = null;
         refreshKnownContents();
@@ -129,13 +136,13 @@ public final class CreativeTabRuntime {
         }
     }
 
-    public static Optional<Identifier> id(CreativeModeTab tab) {
-        Identifier registered = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+    public static Optional<ResourceLocation> id(CreativeModeTab tab) {
+        ResourceLocation registered = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
         if (registered != null) {
             return Optional.of(registered);
         }
         State preview = PREVIEW.get();
-        Identifier previewId = preview == null ? null : preview.idsByRuntimeTab.get(tab);
+        ResourceLocation previewId = preview == null ? null : preview.idsByRuntimeTab.get(tab);
         return Optional.ofNullable(previewId != null ? previewId : ACTIVE.get().idsByRuntimeTab.get(tab));
     }
 
@@ -151,9 +158,9 @@ public final class CreativeTabRuntime {
             return nativeTabs;
         }
         List<CreativeModeTab> nativeList = nativeTabs.toList();
-        Map<Identifier, CreativeModeTab> byId = new LinkedHashMap<>();
+        Map<ResourceLocation, CreativeModeTab> byId = new LinkedHashMap<>();
         for (CreativeModeTab tab : nativeList) {
-            Identifier id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+            ResourceLocation id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
             if (id != null) {
                 byId.put(id, tab);
             }
@@ -178,33 +185,80 @@ public final class CreativeTabRuntime {
         }
         CreativeModeTab search = CreativeModeTabs.searchTab();
 
+// @target if minecraft_version=1.20.1
+//|        Map<Item, List<ItemStack>> aggregateByItem = new LinkedHashMap<>();
+//|        List<ItemStack> insertionOrder = new ArrayList<>();
+// @target else
         Map<StackKey, ItemStack> aggregate = new LinkedHashMap<>();
+// @target end
         effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream()).forEach(tab -> {
             if (tab != search && definition(tab).map(definition -> !definition.hidden()).orElse(true)) {
                 for (ItemStack stack : tab.getSearchTabDisplayItems()) {
+// @target if minecraft_version=1.20.1
+//|                    List<ItemStack> bucket = aggregateByItem.computeIfAbsent(stack.getItem(), ignored -> new ArrayList<>());
+//|                    if (bucket.stream().noneMatch(candidate -> ItemStack.isSameItemSameTags(candidate, stack))) {
+//|                        bucket.add(stack);
+//|                        insertionOrder.add(stack);
+//|                    }
+// @target else
                     aggregate.putIfAbsent(StackKey.of(stack), stack);
+// @target end
                 }
             }
         });
+// @target if minecraft_version=1.20.1
+//|        List<ItemStack> ordered = new ArrayList<>(insertionOrder.size());
+//|        Set<ItemStack> selected = Collections.newSetFromMap(new IdentityHashMap<>());
+// @target else
         List<ItemStack> ordered = new ArrayList<>(aggregate.size());
+// @target end
         definition(search).ifPresent(definition -> {
             for (int index = 0; index < definition.itemCount(); index++) {
                 ItemStack preferred = definition.itemAt(index);
+// @target if minecraft_version=1.20.1
+//|                List<ItemStack> bucket = aggregateByItem.get(preferred.getItem());
+//|                if (bucket == null) {
+//|                    continue;
+//|                }
+//|                for (ItemStack candidate : bucket) {
+//|                    if (!selected.contains(candidate) && ItemStack.isSameItemSameTags(candidate, preferred)) {
+//|                        selected.add(candidate);
+//|                        ordered.add(candidate);
+//|                        break;
+//|                    }
+// @target else
                 ItemStack present = aggregate.remove(StackKey.of(preferred));
                 if (present != null) {
                     ordered.add(present);
+// @target end
                 }
             }
         });
+// @target if minecraft_version=1.20.1
+//|        for (ItemStack stack : insertionOrder) {
+//|            if (selected.add(stack)) {
+//|                ordered.add(stack);
+//|            }
+//|        }
+// @target else
         ordered.addAll(aggregate.values());
+// @target end
         ((CreativeTabContents) search).visualCreativeTabEditor$replaceContents(ordered, ordered);
+// @target if minecraft_version=1.20.1
+//|        search.rebuildSearchTree();
+// @target else
+// @target end
     }
 
-    /**
-     * Projects the active catalog directly into vanilla tab collections.
-     * This deliberately bypasses {@link CreativeModeTab#buildContents} because
-     * performance mods may memoize that complete method and skip Mixin hooks.
-     */
+// @target if minecraft_version=26.1.2,26.2
+//|    /**
+//|     * Projects the active catalog directly into vanilla tab collections.
+//|     * This deliberately bypasses {@link CreativeModeTab#buildContents} because
+//|     * performance mods may memoize that complete method and skip Mixin hooks.
+//|     */
+// @target else
+    /** Projects catalog contents without relying on buildContents hooks that performance mods may memoize. */
+// @target end
     public static void refreshContents(CreativeModeTab.ItemDisplayParameters parameters) {
         Objects.requireNonNull(parameters, "parameters");
         applyCatalogContents(parameters.hasPermissions());
@@ -227,7 +281,7 @@ public final class CreativeTabRuntime {
             return;
         }
 
-        Set<Identifier> changedContents = new HashSet<>();
+        Set<ResourceLocation> changedContents = new HashSet<>();
         boolean searchChanged = false;
         for (CreativeTabDefinition definition : current.catalog.orderedDefinitions()) {
             CreativeTabDefinition before = previous.catalog.definitions().get(definition.id());
@@ -263,7 +317,7 @@ public final class CreativeTabRuntime {
         applyCatalogContents(hasPermissions, null);
     }
 
-    private static void applyCatalogContents(boolean hasPermissions, Set<Identifier> changedContents) {
+    private static void applyCatalogContents(boolean hasPermissions, Set<ResourceLocation> changedContents) {
         effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream()).forEach(tab -> {
             CreativeTabDefinition definition = definition(tab).orElse(null);
             if (definition == null || definition.type() != CreativeTabType.CATEGORY) {
@@ -274,7 +328,11 @@ public final class CreativeTabRuntime {
             }
             Collection<ItemStack> display = new ArrayList<>();
             Collection<ItemStack> searchable = new ArrayList<>();
-            if (id(tab).filter(id -> id.equals(Identifier.withDefaultNamespace("op_blocks"))).isPresent()
+// @target if minecraft_version=1.20.1
+//|            if (id(tab).filter(id -> id.equals(new ResourceLocation("minecraft", "op_blocks"))).isPresent()
+// @target else
+            if (id(tab).filter(id -> id.equals(ResourceLocation.withDefaultNamespace("op_blocks"))).isPresent()
+// @target end
                     && !hasPermissions) {
                 ((CreativeTabContents) tab).visualCreativeTabEditor$replaceContents(display, searchable);
                 return;
@@ -313,8 +371,8 @@ public final class CreativeTabRuntime {
 
     private record State(
             CreativeTabCatalog catalog,
-            Map<Identifier, CreativeModeTab> runtimeTabs,
-            Map<CreativeModeTab, Identifier> idsByRuntimeTab
+            Map<ResourceLocation, CreativeModeTab> runtimeTabs,
+            Map<CreativeModeTab, ResourceLocation> idsByRuntimeTab
     ) {
         private static State empty() {
             return new State(CreativeTabCatalog.EMPTY, Map.of(), Map.of());
@@ -328,10 +386,10 @@ public final class CreativeTabRuntime {
         private static State create(
                 CreativeTabCatalog catalog,
                 State previous,
-                Map<Identifier, CreativeModeTab> handoff
+                Map<ResourceLocation, CreativeModeTab> handoff
         ) {
-            Map<Identifier, CreativeModeTab> runtime = new LinkedHashMap<>();
-            Map<CreativeModeTab, Identifier> reverse = new IdentityHashMap<>();
+            Map<ResourceLocation, CreativeModeTab> runtime = new LinkedHashMap<>();
+            Map<CreativeModeTab, ResourceLocation> reverse = new IdentityHashMap<>();
             for (CreativeTabDefinition definition : catalog.orderedDefinitions()) {
                 if (BuiltInRegistries.CREATIVE_MODE_TAB.getOptional(definition.id()).isPresent()
                         || definition.type() != CreativeTabType.CATEGORY) {
@@ -353,10 +411,13 @@ public final class CreativeTabRuntime {
             return new State(catalog, Map.copyOf(runtime), Map.copyOf(reverse));
         }
     }
+// @target if minecraft_version=1.20.1
+// @target else
 
     private record StackKey(Item item, DataComponentMap components) {
         private static StackKey of(ItemStack stack) {
             return new StackKey(stack.getItem(), stack.getComponents());
         }
     }
+// @target end
 }

@@ -1,7 +1,7 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -15,7 +15,7 @@ import java.util.Objects;
  * sequence; {@code searchItems} is the sequence contributed to global search.
  */
 public record CreativeTabDefinition(
-        Identifier id,
+        ResourceLocation id,
         int format,
         Component title,
         ItemStack icon,
@@ -42,7 +42,7 @@ public record CreativeTabDefinition(
      * as visible in search. Both lists are still copied independently.
      */
     public CreativeTabDefinition(
-            Identifier id,
+            ResourceLocation id,
             int format,
             Component title,
             ItemStack icon,
@@ -58,7 +58,7 @@ public record CreativeTabDefinition(
     }
 
     /** Creates a safe category baseline for a new identifier. */
-    public static CreativeTabDefinition defaults(Identifier id) {
+    public static CreativeTabDefinition defaults(ResourceLocation id) {
         Objects.requireNonNull(id, "id");
         return new CreativeTabDefinition(
                 id,
@@ -75,7 +75,7 @@ public record CreativeTabDefinition(
     }
 
     /** Resolves low-to-high patches against the safe default baseline. */
-    public static CreativeTabDefinition resolve(Identifier id, Iterable<CreativeTabPatch> lowToHigh) {
+    public static CreativeTabDefinition resolve(ResourceLocation id, Iterable<CreativeTabPatch> lowToHigh) {
         return defaults(id).apply(CreativeTabPatch.merge(lowToHigh));
     }
 
@@ -131,7 +131,11 @@ public record CreativeTabDefinition(
 
     /** Compares one parent-tab stack without exposing or copying the stored stack. */
     public boolean itemMatches(int index, ItemStack other) {
+// @target if minecraft_version=1.20.1
+//|        return ItemStack.isSameItemSameTags(items.get(index), Objects.requireNonNull(other, "other"));
+// @target else
         return ItemStack.isSameItemSameComponents(items.get(index), Objects.requireNonNull(other, "other"));
+// @target end
     }
 
     /** Appends defensive count-one copies without allocating an intermediate list. */
@@ -180,7 +184,11 @@ public record CreativeTabDefinition(
             return false;
         }
         for (int index = 0; index < left.size(); index++) {
+// @target if minecraft_version=1.20.1
+//|            if (!ItemStack.isSameItemSameTags(left.get(index), right.get(index))) {
+// @target else
             if (!ItemStack.isSameItemSameComponents(left.get(index), right.get(index))) {
+// @target end
                 return false;
             }
         }
