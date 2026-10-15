@@ -7,6 +7,9 @@ package com.kltyton.visual_creative_tab_editor.mixin.client;
 import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import com.kltyton.visual_creative_tab_editor.client.editor.CreativeTabEditorController;
 import com.kltyton.visual_creative_tab_editor.client.editor.CreativeTabEditorHost;
+import com.kltyton.visual_creative_tab_editor.client.editor.CreativeModeItemPickerMenuVirtualTail;
+import com.kltyton.visual_creative_tab_editor.client.editor.CreativeItemGroups;
+import net.minecraft.ChatFormatting;
 import com.kltyton.visual_creative_tab_editor.client.CreativeTabClientPlatform;
 import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
 import java.util.ArrayList;
@@ -55,7 +58,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Adds the long-press, mobile-desktop-style visual editor to the Creative inventory. */
+/** Adds editor input and expandable item groups to the Creative inventory. */
 @Mixin(CreativeModeInventoryScreen.class)
 public abstract class CreativeModeInventoryScreenEditorMixin
         extends AbstractContainerScreen<CreativeModeInventoryScreen.ItemPickerMenu>
@@ -223,6 +226,16 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     }
 
     @Override
+    public void visualCreativeTabEditor$renderItemGroupBackground(GuiGraphics graphics, Slot slot) {
+        this.visualCreativeTabEditor$editor().renderItemGroupBackground(graphics, slot);
+    }
+
+    @Override
+    public void visualCreativeTabEditor$renderItemGroupBadge(GuiGraphics graphics, Slot slot) {
+        this.visualCreativeTabEditor$editor().renderItemGroupBadge(graphics, slot);
+    }
+
+    @Override
     public void visualCreativeTabEditor$renderEditorOverlay(
             GuiGraphics graphics,
             int mouseX,
@@ -295,6 +308,42 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         );
         if (reject) {
             callback.cancel();
+        } else {
+            ((CreativeModeItemPickerMenuVirtualTail) this.menu).visualCreativeTabEditor$itemGroups().selectTab(tab);
+        }
+    }
+
+    @Inject(method = "refreshSearchResults", at = @At("HEAD"))
+    private void visualCreativeTabEditor$invalidateSearchGroups(CallbackInfo callback) {
+        ((CreativeModeItemPickerMenuVirtualTail) this.menu).visualCreativeTabEditor$itemGroups().invalidate();
+    }
+
+    @Inject(method = "refreshCurrentTabContents", at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/core/NonNullList;clear()V",
+            shift = At.Shift.AFTER
+    ))
+    private void visualCreativeTabEditor$invalidateRefreshedGroups(CallbackInfo callback) {
+        ((CreativeModeItemPickerMenuVirtualTail) this.menu).visualCreativeTabEditor$itemGroups().invalidate();
+    }
+
+    @Inject(method = "getTooltipFromContainerItem", at = @At("RETURN"), cancellable = true)
+    private void visualCreativeTabEditor$describeItemGroup(
+            ItemStack stack, CallbackInfoReturnable<List<Component>> callback
+    ) {
+        if (this.hoveredSlot == null || !this.visualCreativeTabEditor$isCreativeSlot(this.hoveredSlot)) {
+            return;
+        }
+        CreativeItemGroups groups = ((CreativeModeItemPickerMenuVirtualTail) this.menu).visualCreativeTabEditor$itemGroups();
+        int displayIndex = this.menu.getRowIndexForScroll(this.visualCreativeTabEditor$scrollOffset()) * 9
+                + this.hoveredSlot.index;
+        if (groups.isHeader(displayIndex)) {
+            List<Component> lines = new ArrayList<>(callback.getReturnValue());
+            if (!lines.isEmpty()) { lines.set(0, groups.title(displayIndex, this.menu.items)); }
+            lines.add(Component.translatable(groups.isExpanded(displayIndex)
+                    ? "visual_creative_tab_editor.group.collapse" : "visual_creative_tab_editor.group.expand",
+                    groups.memberCount(displayIndex)).withStyle(ChatFormatting.GRAY));
+            callback.setReturnValue(lines);
         }
     }
 

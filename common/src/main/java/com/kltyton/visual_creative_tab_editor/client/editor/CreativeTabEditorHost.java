@@ -25,6 +25,10 @@ public interface CreativeTabEditorHost {
 
     boolean visualCreativeTabEditor$suppressesTooltips();
 
+    void visualCreativeTabEditor$renderItemGroupBackground(GuiGraphics graphics, Slot slot);
+
+    void visualCreativeTabEditor$renderItemGroupBadge(GuiGraphics graphics, Slot slot);
+
     void visualCreativeTabEditor$renderEditorOverlay(
             GuiGraphics graphics,
             int mouseX,

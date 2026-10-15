@@ -27,6 +27,8 @@ public final class VisualCreativeTabEditorForgeClient {
     /** Installs client-only Forge hooks after the physical-side guard in the mod entrypoint. */
 // @target end
     public static void register() {
+        com.kltyton.visual_creative_tab_editor.client.config.CreativeTabClientConfig.load(
+                net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get());
         MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditorForgeClient::loggingOut);
         CreativeTabNetworkBridge.installClientSender(VisualCreativeTabEditorForgeNetwork::sendToServer);
         CreativeTabClientPlatform.installServerCapability(() -> {

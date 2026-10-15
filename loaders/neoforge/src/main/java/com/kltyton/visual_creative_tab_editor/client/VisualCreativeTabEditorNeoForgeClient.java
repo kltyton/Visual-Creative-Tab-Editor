@@ -49,6 +49,8 @@ public final class VisualCreativeTabEditorNeoForgeClient {
     public static void register() {
 // @target end
         NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, VisualCreativeTabEditorNeoForgeClient::loggingOut);
+        com.kltyton.visual_creative_tab_editor.client.config.CreativeTabClientConfig.load(
+                net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get());
 // @target if minecraft_version=26.1.2,26.2
 //|        CreativeTabNetworkBridge.installClientSender(ClientPacketDistributor::sendToServer);
 // @target else

@@ -30,6 +30,8 @@ import net.minecraft.client.Minecraft;
 public final class VisualCreativeTabEditorClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
+        com.kltyton.visual_creative_tab_editor.client.config.CreativeTabClientConfig.load(
+                net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
 // @target if minecraft_version=1.20.1
 //|        CreativeTabClientPlatform.installServerCapability(() -> ClientPlayNetworking.canSend(com.kltyton.visual_creative_tab_editor.network.EditChunkPayload.ID));
 // @target else

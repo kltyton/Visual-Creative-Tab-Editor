@@ -23,11 +23,11 @@ public record EditChunkPayload(
 // @target if minecraft_version=1.20.1
 //|) implements CreativeTabPayload {
 //|    public static final ResourceLocation ID =
-//|            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "edit_chunk");
+//|            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "edit_chunk_v3");
 // @target else
 ) implements CustomPacketPayload {
     public static final Type<EditChunkPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_chunk")
+            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_chunk_v3")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, EditChunkPayload> STREAM_CODEC =

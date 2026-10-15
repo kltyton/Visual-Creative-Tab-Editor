@@ -1,5 +1,7 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
+import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGroup;
+import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -57,6 +59,7 @@ public final class CreativeTabJsonCodec {
             "icon",
             "items",
             "search_items",
+            "item_groups",
             "hidden",
             "order",
             "type",
@@ -131,7 +134,8 @@ public final class CreativeTabJsonCodec {
                     readBooleanOptional(object, "can_scroll"),
                     readBooleanOptional(object, "show_title"),
                     readBooleanOptional(object, "aligned_right"),
-                    readResourceLocation(object, "background")
+                    readResourceLocation(object, "background"),
+                    readGrouping(object, registries)
             );
         } catch (JsonParseException exception) {
             throw exception;
@@ -169,6 +173,7 @@ public final class CreativeTabJsonCodec {
         patch.showTitle().ifPresent(value -> object.addProperty("show_title", value));
         patch.alignedRight().ifPresent(value -> object.addProperty("aligned_right", value));
         patch.background().ifPresent(value -> object.addProperty("background", value.toString()));
+        patch.grouping().ifPresent(value -> object.add("item_groups", encodeGrouping(value, registries)));
         ensureDocumentSize(object.toString());
         return object;
     }
@@ -245,6 +250,10 @@ public final class CreativeTabJsonCodec {
         }
         List<ItemStack> items = new ArrayList<>(array.size());
         for (int index = 0; index < array.size(); index++) {
+            if (field.equals("items") && array.get(index).isJsonNull()) {
+                items.add(ItemStack.EMPTY);
+                continue;
+            }
 // @target if minecraft_version=1.20.1
 //|            items.add(decodeItemStack(field + "[" + index + "]", array.get(index)));
 // @target else
@@ -254,6 +263,68 @@ public final class CreativeTabJsonCodec {
         return Optional.of(List.copyOf(items));
     }
 
+    private static Optional<CreativeItemGrouping> readGrouping(JsonObject object, HolderLookup.Provider registries) {
+        if (!object.has("item_groups")) { return Optional.empty(); }
+        JsonObject grouping = requireValue(object, "item_groups").getAsJsonObject();
+        for (String field : grouping.keySet()) {
+            if (!field.equals("groups") && !field.equals("ungrouped")) {
+                throw new JsonParseException("Unknown item grouping field: " + field);
+            }
+        }
+        List<CreativeItemGroup> groups = new ArrayList<>();
+        if (grouping.has("groups")) {
+            JsonArray entries = requireValue(grouping, "groups").getAsJsonArray();
+            if (entries.size() > CreativeTabValidation.MAX_ITEMS_PER_TAB) {
+                throw new JsonParseException("Too many item groups");
+            }
+            for (JsonElement element : entries) {
+                JsonObject entry = element.getAsJsonObject();
+                for (String field : entry.keySet()) {
+                    if (!Set.of("id", "title", "icon", "items").contains(field)) {
+                        throw new JsonParseException("Unknown item group field: " + field);
+                    }
+                }
+                String id = readString(entry, "id");
+                JsonObject values = entry.deepCopy();
+                values.remove("id");
+                CreativeTabPatch decoded = decodePatch(values, registries);
+                groups.add(new CreativeItemGroup(id,
+                        decoded.title().orElseThrow(() -> new JsonParseException("Item group title is required")),
+                        decoded.icon().orElseThrow(() -> new JsonParseException("Item group icon is required")),
+                        decoded.items().orElseThrow(() -> new JsonParseException("Item group items are required"))));
+            }
+        }
+        List<ItemStack> ungrouped = List.of();
+        if (grouping.has("ungrouped")) {
+            JsonObject values = new JsonObject();
+            values.add("items", requireValue(grouping, "ungrouped"));
+            ungrouped = decodePatch(values, registries).items().orElseThrow();
+        }
+        return Optional.of(new CreativeItemGrouping(groups, ungrouped));
+    }
+
+    private static JsonObject encodeGrouping(CreativeItemGrouping grouping, HolderLookup.Provider registries) {
+        JsonObject result = new JsonObject();
+        JsonArray entries = new JsonArray();
+        for (CreativeItemGroup group : grouping.groups()) {
+            JsonObject values = encodePatch(itemValuePatch(Optional.of(group.title()), Optional.of(group.icon()), group.items()), registries);
+            values.remove("format");
+            JsonObject entry = new JsonObject();
+            entry.addProperty("id", group.id());
+            values.entrySet().forEach(field -> entry.add(field.getKey(), field.getValue()));
+            entries.add(entry);
+        }
+        result.add("groups", entries);
+        result.add("ungrouped", encodePatch(itemValuePatch(Optional.empty(), Optional.empty(), grouping.ungrouped()), registries).get("items"));
+        return result;
+    }
+
+    private static CreativeTabPatch itemValuePatch(Optional<Component> title, Optional<ItemStack> icon, List<ItemStack> items) {
+        return new CreativeTabPatch(CreativeTabPatch.CURRENT_FORMAT, title, icon, Optional.of(items),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
 // @target if minecraft_version=1.20.1
 //|    private static JsonArray encodeItems(String field, List<ItemStack> items) {
 // @target else
@@ -261,6 +332,10 @@ public final class CreativeTabJsonCodec {
 // @target end
         JsonArray array = new JsonArray();
         for (int index = 0; index < items.size(); index++) {
+            if (field.equals("items") && items.get(index).isEmpty()) {
+                array.add(com.google.gson.JsonNull.INSTANCE);
+                continue;
+            }
 // @target if minecraft_version=1.20.1
 //|            array.add(encodeItemStack(field + "[" + index + "]", items.get(index)));
 // @target else

@@ -42,7 +42,7 @@ import net.minecraftforge.network.SimpleChannel;
 // @target end
 public final class VisualCreativeTabEditorForgeNetwork {
 // @target if minecraft_version=1.20.1
-//|    private static final String NETWORK_VERSION = "2";
+//|    private static final String NETWORK_VERSION = "3";
 //|    private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
 //|            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "main"),
 //|            () -> NETWORK_VERSION,
@@ -50,7 +50,7 @@ public final class VisualCreativeTabEditorForgeNetwork {
 //|            version -> NETWORK_VERSION.equals(version) || NetworkRegistry.ABSENT.equals(version) || NetworkRegistry.ACCEPTVANILLA.equals(version)
 //|    );
 // @target else
-    private static final int NETWORK_VERSION = 2;
+    private static final int NETWORK_VERSION = 3;
     private static final SimpleChannel CHANNEL = ChannelBuilder.named(ResourceLocation.fromNamespaceAndPath(
                     VisualCreativeTabEditorConstants.MOD_ID,
                     "main"

@@ -1,5 +1,6 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
+import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -24,7 +25,8 @@ public record CreativeTabDefinition(
         boolean hidden,
         int order,
         CreativeTabType type,
-        CreativeTabLayout layout
+        CreativeTabLayout layout,
+        CreativeItemGrouping grouping
 ) {
     public CreativeTabDefinition {
         Objects.requireNonNull(id, "id");
@@ -34,7 +36,17 @@ public record CreativeTabDefinition(
         searchItems = copyStacks(searchItems);
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(layout, "layout");
+        Objects.requireNonNull(grouping, "grouping");
+        if (type != CreativeTabType.CATEGORY && type != CreativeTabType.SEARCH && !grouping.isEmpty()) {
+            throw new IllegalArgumentException("System inventory and hotbar tabs cannot contain item groups");
+        }
         CreativeTabValidation.validateDefinitionFields(format, title, icon, items, searchItems, order, type);
+    }
+
+    public CreativeTabDefinition(ResourceLocation id, int format, Component title, ItemStack icon,
+            List<ItemStack> items, List<ItemStack> searchItems, boolean hidden, int order,
+            CreativeTabType type, CreativeTabLayout layout) {
+        this(id, format, title, icon, items, searchItems, hidden, order, type, layout, CreativeItemGrouping.EMPTY);
     }
 
     /**
@@ -53,7 +65,7 @@ public record CreativeTabDefinition(
             CreativeTabLayout layout
     ) {
         this(id, format, title, icon, items,
-                type == CreativeTabType.CATEGORY ? items : List.of(),
+                type == CreativeTabType.CATEGORY ? items.stream().filter(stack -> !stack.isEmpty()).toList() : List.of(),
                 hidden, order, type, layout);
     }
 
@@ -95,13 +107,19 @@ public record CreativeTabDefinition(
                 patch.hidden().orElse(hidden),
                 patch.order().orElse(order),
                 patch.type().orElse(type),
-                layout.apply(patch)
+                layout.apply(patch),
+                patch.grouping().orElse(grouping)
         );
     }
 
     /** Applies patches in resource-pack order, from lowest to highest priority. */
     public CreativeTabDefinition applyAll(Iterable<CreativeTabPatch> lowToHigh) {
         return apply(CreativeTabPatch.merge(lowToHigh));
+    }
+
+    public CreativeTabDefinition withGrouping(CreativeItemGrouping grouping) {
+        return new CreativeTabDefinition(id, format, title, icon, items, searchItems, hidden, order,
+                type, layout, grouping);
     }
 
     @Override

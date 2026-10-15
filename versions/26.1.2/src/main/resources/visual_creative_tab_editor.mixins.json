@@ -14,7 +14,8 @@
     "client.ScreenEditorOverlayMixin",
     "client.AbstractContainerScreenTooltipMixin",
     "client.CreativeModeInventoryScreenEditorMixin",
-    "client.CreativeModeItemPickerMenuVirtualTailMixin"
+    "client.CreativeModeItemPickerMenuVirtualTailMixin",
+    "client.AbstractContainerScreenItemGroupMixin"
   ],
   "server": [],
   "injectors": {

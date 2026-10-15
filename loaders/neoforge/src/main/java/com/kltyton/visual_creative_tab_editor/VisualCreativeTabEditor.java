@@ -47,7 +47,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /** NeoForge loader entrypoint. */
 @Mod(VisualCreativeTabEditorConstants.MOD_ID)
 public final class VisualCreativeTabEditor {
-    private static final String NETWORK_VERSION = "2";
+    private static final String NETWORK_VERSION = "3";
 // @target if minecraft_version=26.1.2,26.2
 //|    private static final ResourceLocation RELOAD_LISTENER_ID = ResourceLocation.fromNamespaceAndPath(
 //|            VisualCreativeTabEditorConstants.MOD_ID,

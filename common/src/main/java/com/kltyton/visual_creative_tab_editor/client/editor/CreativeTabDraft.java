@@ -6,6 +6,9 @@ import com.kltyton.visual_creative_tab_editor.data.CreativeTabLayout;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabPatch;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabValidation;
+import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGroup;
+import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping;
+import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping.ItemKey;
 // @target if minecraft_version=1.20.1
 //|import net.minecraft.nbt.CompoundTag;
 // @target else
@@ -42,6 +45,7 @@ public final class CreativeTabDraft {
     private final List<CreativeTabDefinition> tabs = new ArrayList<>();
     private final LinkedHashSet<ResourceLocation> selectedTabIds = new LinkedHashSet<>();
     private final NavigableSet<Integer> selectedItemIndices = new TreeSet<>();
+    private final Map<String, String> lastMovedGroupIds = new HashMap<>();
     private final List<ItemStack> currentSearchItems = new ArrayList<>();
 // @target if minecraft_version=1.20.1
 //|    private final Map<Item, Map<CompoundTag, Integer>> currentSearchItemIndices = new HashMap<>();
@@ -52,6 +56,14 @@ public final class CreativeTabDraft {
     private CreativeTabType currentTabType = CreativeTabType.CATEGORY;
     private int currentSearchPreferenceCapacity;
     private boolean currentSearchItemsPrepared;
+    private long preparedSearchRevision;
+    private long itemSelectionRevision;
+    private CreativeTabDefinition groupedDefinition;
+    private long groupedSearchRevision = -1L;
+    private CreativeItemGroups groupedItems;
+    private CreativeItemGroups selectedGroupProjection;
+    private long groupedSelectionRevision = -1L;
+    private final Map<String, Integer> selectedGroupCounts = new HashMap<>();
 
     /** Creates a deep editing copy of {@code catalog}. */
     public CreativeTabDraft(CreativeTabCatalog catalog) {
@@ -186,6 +198,7 @@ public final class CreativeTabDraft {
         this.tabs.addAll(remaining);
         normalizeTabOrders();
         if (this.currentTabType == CreativeTabType.SEARCH) {
+            this.itemSelectionRevision++;
             this.selectedItemIndices.clear();
             invalidatePreparedSearchItems();
         }
@@ -206,6 +219,7 @@ public final class CreativeTabDraft {
             }
         }
         if (changed && this.currentTabType == CreativeTabType.SEARCH) {
+            this.itemSelectionRevision++;
             this.selectedItemIndices.clear();
             invalidatePreparedSearchItems();
         }
@@ -285,8 +299,10 @@ public final class CreativeTabDraft {
         CreativeTabDefinition definition = requireReorderableItemsTab();
         checkElementIndex(index, reorderableItemCount(definition), "item index");
         if (selected) {
+            this.itemSelectionRevision++;
             this.selectedItemIndices.add(index);
         } else {
+            this.itemSelectionRevision++;
             this.selectedItemIndices.remove(index);
         }
     }
@@ -295,14 +311,17 @@ public final class CreativeTabDraft {
     public boolean toggleItemSelection(int index) {
         CreativeTabDefinition definition = requireReorderableItemsTab();
         checkElementIndex(index, reorderableItemCount(definition), "item index");
+        this.itemSelectionRevision++;
         if (this.selectedItemIndices.remove(index)) {
             return false;
         }
+        this.itemSelectionRevision++;
         this.selectedItemIndices.add(index);
         return true;
     }
 
     public void clearItemSelection() {
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
     }
 
@@ -314,6 +333,130 @@ public final class CreativeTabDraft {
         return moveItems(this.selectedItemIndices, targetIndex);
     }
 
+    public CreativeItemGroup itemGroup(String id) {
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        List<ItemStack> items = currentItems();
+        return currentItemGroups().group(id, items);
+    }
+
+    public String itemGroupId(int itemIndex) {
+        return currentItemGroups().groupIdForSource(itemIndex);
+    }
+
+    public void selectItemGroup(String id, boolean selected) {
+        CreativeItemGroups groups = currentItemGroups();
+        for (int index : groups.memberIndices(id)) { setItemSelected(index, selected); }
+    }
+
+    public int selectedItemCount() { return this.selectedItemIndices.size(); }
+
+    public boolean isItemGroupSelected(String id) {
+        updateSelectedGroups();
+        int members = this.groupedItems.memberCount(id);
+        return members > 0 && this.selectedGroupCounts.getOrDefault(id, 0) == members;
+    }
+
+    public void toggleItemGroupSelection(String id) { selectItemGroup(id, !isItemGroupSelected(id)); }
+
+    public boolean hasSelectedGroupedItems() {
+        updateSelectedGroups();
+        return !this.selectedGroupCounts.isEmpty();
+    }
+
+    public boolean selectedItemsBelongToGroup(String id) {
+        updateSelectedGroups();
+        return !this.selectedItemIndices.isEmpty()
+                && this.selectedGroupCounts.getOrDefault(id, 0) == this.selectedItemIndices.size();
+    }
+
+    private CreativeItemGroups currentItemGroups() {
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        if (this.groupedItems == null || this.groupedDefinition != definition
+                || this.groupedSearchRevision != this.preparedSearchRevision) {
+            this.groupedItems = CreativeItemGroups.forItems(definition.grouping(), currentItems());
+            this.groupedDefinition = definition;
+            this.groupedSearchRevision = this.preparedSearchRevision;
+        }
+        return this.groupedItems;
+    }
+
+    private void updateSelectedGroups() {
+        CreativeItemGroups groups = currentItemGroups();
+        if (this.selectedGroupProjection == groups && this.groupedSelectionRevision == this.itemSelectionRevision) {
+            return;
+        }
+        this.selectedGroupCounts.clear();
+        for (int index : this.selectedItemIndices) {
+            String group = groups.groupIdForSource(index);
+            if (group != null) {
+                this.selectedGroupCounts.merge(group, 1, Integer::sum);
+            }
+        }
+        this.selectedGroupProjection = groups;
+        this.groupedSelectionRevision = this.itemSelectionRevision;
+    }
+
+    public String createItemGroup() {
+        requireReorderableItemsTab();
+        List<ItemStack> selected = selectedItems();
+        if (selected.size() < 2) { throw new IllegalStateException("Select at least two items to create a group"); }
+        String id = "custom/" + UUID.randomUUID();
+        putItemGroup(new CreativeItemGroup(id, Component.translatable("visual_creative_tab_editor.group.unnamed"),
+                selected.get(0), selected));
+        return id;
+    }
+
+    public void setItemGroupTitle(String id, Component title) {
+        CreativeItemGroup group = itemGroup(id);
+        putItemGroup(new CreativeItemGroup(id, title, group.icon(), group.items()));
+    }
+
+    public void setItemGroupIcon(String id, ItemStack icon) {
+        CreativeItemGroup group = itemGroup(id);
+        putItemGroup(new CreativeItemGroup(id, group.title(), normalizeStack(icon), group.items()));
+    }
+
+    public void dissolveItemGroup(String id) {
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        putGrouping(definition.grouping().dissolve(id, itemGroup(id).items()));
+    }
+
+    public void assignSelectedItemsToGroup(String id) {
+        CreativeItemGroup group = itemGroup(id);
+        List<ItemStack> members = new ArrayList<>(group.items());
+        Set<ItemKey> present = CreativeItemGrouping.keys(members);
+        for (ItemStack item : selectedItems()) {
+            if (present.add(new ItemKey(item))) { members.add(item); }
+        }
+        putItemGroup(new CreativeItemGroup(id, group.title(), group.icon(), members));
+    }
+
+    public void detachSelectedItemsFromGroups() {
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        putGrouping(materializeGrouping(definition, currentItems()).detach(selectedItems()));
+    }
+
+    public record GroupMove(String groupId, int movedItems) { }
+
+    public GroupMove moveItemGroupToTab(String id, ResourceLocation targetId) {
+        int moved = moveSelectedItemsToTab(targetId);
+        return new GroupMove(this.lastMovedGroupIds.getOrDefault(id, id), moved);
+    }
+
+    private List<ItemStack> selectedItems() {
+        List<ItemStack> items = currentItems();
+        return checkedItemIndices(this.selectedItemIndices, items.size()).stream().map(items::get).toList();
+    }
+
+    private void putItemGroup(CreativeItemGroup group) {
+        putGrouping(materializeGrouping(requireReorderableItemsTab(), currentItems()).assign(group));
+    }
+
+    private void putGrouping(CreativeItemGrouping grouping) {
+        CreativeTabDefinition definition = requireReorderableItemsTab();
+        this.tabs.set(requireTabIndex(definition.id()), definition.withGrouping(grouping));
+    }
+
     /**
      * Moves the selected items into another category tab, appending them as one
      * stable block and making that tab the current item-editing target.
@@ -322,6 +465,7 @@ public final class CreativeTabDraft {
      *         cannot accept the block without exceeding a per-list limit
      */
     public int moveSelectedItemsToTab(ResourceLocation targetTabId) {
+        this.lastMovedGroupIds.clear();
         CreativeTabDefinition source = requireEditableCategory();
         ResourceLocation checkedTargetId = requireExistingId(targetTabId);
         if (source.id().equals(checkedTargetId)) {
@@ -332,7 +476,8 @@ public final class CreativeTabDraft {
             throw new IllegalStateException("Only category tabs can receive dragged items");
         }
 
-        List<ItemStack> sourceItems = new ArrayList<>(source.items());
+        List<ItemStack> sourceSnapshot = source.items();
+        List<ItemStack> sourceItems = new ArrayList<>(sourceSnapshot);
         NavigableSet<Integer> movingIndices = checkedItemIndices(this.selectedItemIndices, sourceItems.size());
         if (movingIndices.isEmpty()) {
             return 0;
@@ -377,8 +522,28 @@ public final class CreativeTabDraft {
             return -1;
         }
 
-        CreativeTabDefinition updatedSource = withItemsAndSearchItems(source, sourceItems, sourceSearchItems);
-        CreativeTabDefinition updatedTarget = withItemsAndSearchItems(target, targetItems, targetSearchItems);
+        CreativeItemGrouping sourceGrouping = materializeGrouping(source, sourceSnapshot);
+        CreativeItemGroups sourceGroups = CreativeItemGroups.forItems(sourceGrouping, sourceSnapshot);
+        List<CreativeItemGroup> transferredGroups = new ArrayList<>();
+        List<ItemStack> transferredMembers = new ArrayList<>();
+        for (String groupId : sourceGroups.groupIds()) {
+            List<Integer> indices = sourceGroups.memberIndices(groupId);
+            if (!indices.isEmpty() && movingIndices.containsAll(indices)) {
+                CreativeItemGroup group = sourceGroups.group(groupId, sourceSnapshot);
+                String movedId = "custom/" + UUID.randomUUID();
+                List<ItemStack> members = indices.stream().map(sourceSnapshot::get).toList();
+                transferredGroups.add(new CreativeItemGroup(movedId, group.title(), group.icon(), members));
+                transferredMembers.addAll(members);
+                this.lastMovedGroupIds.put(groupId, movedId);
+            }
+        }
+        CreativeItemGrouping targetGrouping = materializeGrouping(target, target.items()).remove(transferredMembers);
+        List<CreativeItemGroup> targetGroups = new ArrayList<>(targetGrouping.groups());
+        targetGroups.addAll(transferredGroups);
+        CreativeTabDefinition updatedSource = withItemsAndSearchItems(source, sourceItems, sourceSearchItems)
+                .withGrouping(sourceGrouping.remove(moving));
+        CreativeTabDefinition updatedTarget = withItemsAndSearchItems(target, targetItems, targetSearchItems)
+                .withGrouping(new CreativeItemGrouping(targetGroups, targetGrouping.ungrouped()));
         int sourceTabIndex = requireTabIndex(source.id());
         int targetTabIndex = requireTabIndex(target.id());
         this.tabs.set(sourceTabIndex, updatedSource);
@@ -451,6 +616,8 @@ public final class CreativeTabDraft {
         }
         List<ItemStack> searchItems = removeMatchingStacks(definition.searchItems(), removed);
         replaceCurrentItemsAndSearchItems(definition, items, searchItems);
+        putGrouping(materializeGrouping(definition, definition.items()).remove(removed));
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
         return checked.size();
     }
@@ -483,6 +650,7 @@ public final class CreativeTabDraft {
         List<ItemStack> searchItems = replaceMatchingStacks(
                 definition.searchItems(), List.of(previous), replacement);
         replaceCurrentItemsAndSearchItems(definition, items, searchItems);
+        putGrouping(materializeGrouping(definition, before).replaceItems(List.of(previous), replacement));
         remapSelectedItems(before, items, removedIndices, resultIndex);
         return resultIndex;
     }
@@ -520,6 +688,7 @@ public final class CreativeTabDraft {
 
         List<ItemStack> searchItems = replaceMatchingStacks(definition.searchItems(), replaced, normalized);
         replaceCurrentItemsAndSearchItems(definition, items, searchItems);
+        putGrouping(materializeGrouping(definition, definition.items()).replaceItems(replaced, normalized));
         selectContiguousItems(resultIndex, 1);
         return checked.size();
     }
@@ -567,8 +736,16 @@ public final class CreativeTabDraft {
     public void sortCurrentItems(Comparator<ItemStack> comparator) {
         CreativeTabDefinition definition = requireEditableCategory();
         List<ItemStack> items = new ArrayList<>(copyStacks(definition.items()));
-        items.sort(Objects.requireNonNull(comparator, "comparator"));
+        Objects.requireNonNull(comparator, "comparator");
+        for (int start = 0; start < items.size();) {
+            if (items.get(start).isEmpty()) { start++; continue; }
+            int end = start + 1;
+            while (end < items.size() && !items.get(end).isEmpty()) { end++; }
+            items.subList(start, end).sort(comparator);
+            start = end;
+        }
         replaceCurrentItems(definition, items);
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
     }
 
@@ -593,6 +770,7 @@ public final class CreativeTabDraft {
         items.sort(Objects.requireNonNull(comparator, "comparator"));
         replacePreparedSearchItems(items);
         replaceCurrentItems(definition, searchPreference(definition, this.currentSearchItems));
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
     }
 
@@ -607,6 +785,7 @@ public final class CreativeTabDraft {
             throw new IllegalStateException("The current tab is not the search tab");
         }
         replacePreparedSearchItems(currentSearchItems);
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
     }
 
@@ -708,6 +887,7 @@ public final class CreativeTabDraft {
         this.tabs.sort(Comparator.comparingInt(tab -> baseline.definition(tab.id())
                 .map(CreativeTabDefinition::order).orElse(Integer.MAX_VALUE)));
         normalizeTabOrders();
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
         invalidatePreparedSearchItems();
     }
@@ -863,6 +1043,7 @@ public final class CreativeTabDraft {
     }
 
     private void replacePreparedSearchItems(Collection<ItemStack> stacks) {
+        this.preparedSearchRevision++;
         this.currentSearchItems.clear();
         this.currentSearchItemIndices.clear();
         for (ItemStack stack : stacks) {
@@ -893,6 +1074,7 @@ public final class CreativeTabDraft {
     }
 
     private void invalidatePreparedSearchItems() {
+        this.preparedSearchRevision++;
         this.currentSearchItems.clear();
         this.currentSearchItemIndices.clear();
         this.currentSearchPreferenceCapacity = 0;
@@ -905,6 +1087,7 @@ public final class CreativeTabDraft {
         }
         this.currentTabId = id;
         this.currentTabType = this.tabs.get(requireTabIndex(id)).type();
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
         invalidatePreparedSearchItems();
     }
@@ -1007,7 +1190,9 @@ public final class CreativeTabDraft {
                 remapped.add(mappedIndex);
             }
         }
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
+        this.itemSelectionRevision++;
         this.selectedItemIndices.addAll(remapped);
     }
 
@@ -1065,8 +1250,10 @@ public final class CreativeTabDraft {
     }
 
     private void selectContiguousItems(int firstIndex, int count) {
+        this.itemSelectionRevision++;
         this.selectedItemIndices.clear();
         for (int offset = 0; offset < count; offset++) {
+            this.itemSelectionRevision++;
             this.selectedItemIndices.add(firstIndex + offset);
         }
     }
@@ -1143,29 +1330,28 @@ public final class CreativeTabDraft {
 
     private static ItemStack normalizeStack(ItemStack stack) {
         ItemStack checked = Objects.requireNonNull(stack, "stack");
-        if (checked.isEmpty()) {
-            throw new IllegalArgumentException("Creative-tab stacks cannot be empty");
-        }
-        return checked.copyWithCount(1);
+        return checked.isEmpty() ? ItemStack.EMPTY : checked.copyWithCount(1);
     }
 
     private static List<ItemStack> copyStacks(List<ItemStack> stacks) {
         List<ItemStack> copies = new ArrayList<>(stacks.size());
-// @target if minecraft_version=1.20.1
-//|        Set<ItemStack> unique = ItemStackLinkedSet.createTypeAndTagSet();
-// @target else
-        Set<ItemStack> unique = ItemStackLinkedSet.createTypeAndComponentsSet();
-// @target end
         for (ItemStack stack : stacks) {
-            ItemStack copy = normalizeStack(stack);
-            if (unique.add(copy)) {
-                copies.add(copy);
-            }
+            copies.add(normalizeStack(stack));
         }
         return copies;
     }
 
     private record IndexedSearchPreference(int originalIndex, ItemStack stack) {
+    }
+
+    private static CreativeItemGrouping materializeGrouping(CreativeTabDefinition definition, List<ItemStack> items) {
+        if (definition.grouping().groups().isEmpty()) { return definition.grouping(); }
+        CreativeItemGroups view = CreativeItemGroups.forItems(definition.grouping(), items);
+        List<CreativeItemGroup> groups = new ArrayList<>();
+        for (CreativeItemGroup group : definition.grouping().groups()) {
+            groups.add(view.memberIndices(group.id()).isEmpty() ? group : view.group(group.id(), items));
+        }
+        return new CreativeItemGrouping(groups, definition.grouping().ungrouped());
     }
 
     private static CreativeTabDefinition copyDefinition(CreativeTabDefinition definition, int order) {
@@ -1179,7 +1365,7 @@ public final class CreativeTabDraft {
                 definition.hidden(),
                 order,
                 definition.type(),
-                definition.layout()
+                definition.layout(), definition.grouping()
         );
     }
 
@@ -1187,7 +1373,7 @@ public final class CreativeTabDraft {
         return new CreativeTabDefinition(
                 definition.id(), definition.format(), definition.title(), definition.icon(), copyStacks(items),
                 definition.searchItems(),
-                definition.hidden(), definition.order(), definition.type(), definition.layout()
+                definition.hidden(), definition.order(), definition.type(), definition.layout(), definition.grouping()
         );
     }
 
@@ -1199,7 +1385,7 @@ public final class CreativeTabDraft {
         return new CreativeTabDefinition(
                 definition.id(), definition.format(), definition.title(), definition.icon(),
                 copyStacks(items), copyStacks(searchItems), definition.hidden(), definition.order(),
-                definition.type(), definition.layout()
+                definition.type(), definition.layout(), definition.grouping()
         );
     }
 
@@ -1207,7 +1393,7 @@ public final class CreativeTabDraft {
         return new CreativeTabDefinition(
                 definition.id(), definition.format(), definition.title(), definition.icon(), definition.items(),
                 definition.searchItems(),
-                hidden, definition.order(), definition.type(), definition.layout()
+                hidden, definition.order(), definition.type(), definition.layout(), definition.grouping()
         );
     }
 
@@ -1215,7 +1401,7 @@ public final class CreativeTabDraft {
         return new CreativeTabDefinition(
                 definition.id(), definition.format(), definition.title(), normalizeStack(icon), definition.items(),
                 definition.searchItems(),
-                definition.hidden(), definition.order(), definition.type(), definition.layout()
+                definition.hidden(), definition.order(), definition.type(), definition.layout(), definition.grouping()
         );
     }
 
@@ -1223,7 +1409,7 @@ public final class CreativeTabDraft {
         return new CreativeTabDefinition(
                 definition.id(), definition.format(), title, definition.icon(), definition.items(),
                 definition.searchItems(),
-                definition.hidden(), definition.order(), definition.type(), definition.layout()
+                definition.hidden(), definition.order(), definition.type(), definition.layout(), definition.grouping()
         );
     }
 }

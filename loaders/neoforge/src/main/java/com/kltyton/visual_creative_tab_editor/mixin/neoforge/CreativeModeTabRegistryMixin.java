@@ -17,6 +17,7 @@ public abstract class CreativeModeTabRegistryMixin {
             CallbackInfoReturnable<List<CreativeModeTab>> callback
     ) {
         List<CreativeModeTab> ordered = CreativeTabRuntime.effectiveTabs(callback.getReturnValue().stream())
+                .filter(tab -> !CreativeModeTabRegistry.getDefaultTabs().contains(tab))
                 .filter(tab -> tab.getType() == CreativeModeTab.Type.CATEGORY)
                 .filter(tab -> CreativeTabRuntime.definition(tab).map(definition -> !definition.hidden()).orElse(true))
                 .toList();

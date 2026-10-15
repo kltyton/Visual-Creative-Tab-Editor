@@ -199,7 +199,8 @@ public final class CreativeTabHistory {
                     definition = definition == null ? CreativeTabDefinition.resolve(id, List.of(patch)) : definition.apply(patch);
                 }
                 definitions.add(Objects.requireNonNull(definition));
-                items += (long) definition.itemCount() + definition.searchItemCount();
+                items += (long) definition.itemCount() + definition.searchItemCount()
+                        + definition.grouping().referencedItemCount();
                 if (items > MAX_RETAINED_ITEMS) {
                     throw new IOException("History exceeds retained item capacity");
                 }
@@ -214,7 +215,8 @@ public final class CreativeTabHistory {
         for (Deque<State> states : List.of(this.undo, this.redo)) {
             for (State state : states) {
                 for (CreativeTabDefinition definition : state.catalog().orderedDefinitions()) {
-                    items += (long) definition.itemCount() + definition.searchItemCount();
+                    items += (long) definition.itemCount() + definition.searchItemCount()
+                            + definition.grouping().referencedItemCount();
                 }
             }
         }
@@ -222,7 +224,8 @@ public final class CreativeTabHistory {
                 && (this.undo.size() + this.redo.size() > MAX_STATES || items > MAX_RETAINED_ITEMS)) {
             State removed = !this.undo.isEmpty() ? this.undo.removeFirst() : this.redo.removeFirst();
             for (CreativeTabDefinition definition : removed.catalog().orderedDefinitions()) {
-                items -= (long) definition.itemCount() + definition.searchItemCount();
+                items -= (long) definition.itemCount() + definition.searchItemCount()
+                        + definition.grouping().referencedItemCount();
             }
         }
     }

@@ -49,6 +49,7 @@ public final class CreativeTabValidation {
 
         Set<ResourceLocation> ids = new HashSet<>();
         long totalItems = 0;
+        long totalGroupedItems = 0;
         boolean hasVisibleCategory = false;
         for (CreativeTabDefinition definition : definitions) {
             Objects.requireNonNull(definition, "definition");
@@ -64,6 +65,10 @@ public final class CreativeTabValidation {
             }
             // Definitions validate their private defensive copies during construction.
             totalItems += (long) definition.itemCount() + definition.searchItemCount();
+            totalGroupedItems += definition.grouping().referencedItemCount();
+            if (totalGroupedItems > MAX_TOTAL_ITEMS) {
+                throw new IllegalArgumentException("Too many item group references: " + totalGroupedItems);
+            }
             if (totalItems > MAX_TOTAL_ITEMS) {
                 throw new IllegalArgumentException("Too many creative tab items: " + totalItems + " > " + MAX_TOTAL_ITEMS);
             }
@@ -107,6 +112,9 @@ public final class CreativeTabValidation {
         validateStack(icon, "icon");
         validateItems(items, "items");
         validateItems(searchItems, "search_items");
+        if (type == CreativeTabType.SEARCH && items.stream().anyMatch(ItemStack::isEmpty)) {
+            throw new IllegalArgumentException("Search preferences cannot contain empty layout slots");
+        }
         validateOrder(order);
         if ((type == CreativeTabType.HOTBAR || type == CreativeTabType.INVENTORY)
                 && (!items.isEmpty() || !searchItems.isEmpty())) {
@@ -134,7 +142,11 @@ public final class CreativeTabValidation {
                     + items.size() + " > " + MAX_ITEMS_PER_TAB);
         }
         for (int index = 0; index < items.size(); index++) {
-            validateStack(Objects.requireNonNull(items.get(index), "item"), field + "[" + index + "]");
+            ItemStack stack = Objects.requireNonNull(items.get(index), "item");
+            if (field.equals("items") && stack.isEmpty()) {
+                continue;
+            }
+            validateStack(stack, field + "[" + index + "]");
         }
     }
 

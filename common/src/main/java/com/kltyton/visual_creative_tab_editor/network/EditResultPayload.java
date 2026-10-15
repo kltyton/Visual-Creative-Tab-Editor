@@ -28,11 +28,11 @@ public record EditResultPayload(
 // @target if minecraft_version=1.20.1
 //|) implements CreativeTabPayload {
 //|    public static final ResourceLocation ID =
-//|            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "edit_result");
+//|            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "edit_result_v3");
 // @target else
 ) implements CustomPacketPayload {
     public static final Type<EditResultPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_result")
+            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_result_v3")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, EditResultPayload> STREAM_CODEC =

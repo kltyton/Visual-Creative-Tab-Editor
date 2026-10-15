@@ -44,6 +44,10 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
 
     @Override
     protected Prepared prepare(ResourceManager manager, ProfilerFiller profiler) {
+        return prepareCatalog(manager);
+    }
+
+    public Prepared prepareCatalog(ResourceManager manager) {
         long sourceRevision = CreativeTabServerManager.revision();
         long sourceMutationEpoch = CreativeTabServerManager.packMutationEpoch();
         Map<ResourceLocation, List<Layer>> resources = new LinkedHashMap<>();
@@ -311,7 +315,8 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
     }
 
     private static long itemCount(CreativeTabDefinition definition) {
-        return (long) definition.itemCount() + definition.searchItemCount();
+        return (long) definition.itemCount() + definition.searchItemCount()
+                + definition.grouping().referencedItemCount();
     }
 
     private static CreativeTabCatalog buildBaseCatalog(Map<ResourceLocation, ResolvedBase> definitions) {

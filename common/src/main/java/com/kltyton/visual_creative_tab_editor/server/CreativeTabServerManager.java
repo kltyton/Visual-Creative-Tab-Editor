@@ -569,22 +569,25 @@ public final class CreativeTabServerManager {
         PackRepository repository = target.getPackRepository();
         repository.reload();
         List<String> orderedIds = pinnedReloadPackIds(repository);
-        return target.reloadResources(orderedIds).whenComplete((unused, throwable) -> {
-            if (throwable != null) {
-                VisualCreativeTabEditorConstants.LOGGER.error("Creative-tab data pack reload failed", throwable);
-                return;
-            }
-            VisualCreativeTabEditorConstants.LOGGER.debug(
-                    "[EditorTrace] creative-tab-reload-complete defaultPresent={} baseTabs={} resolvedTabs={} "
-                            + "revision={} defaultSelected={} playerSelected={}",
-                    defaultPresent,
-                    base.orderedDefinitions().size(),
-                    resolved.orderedDefinitions().size(),
-                    REVISION.get(),
-                    repository.getSelectedIds().contains(PinnedWorldPackSource.DEFAULT_PACK_ID),
-                    repository.getSelectedIds().contains(PinnedWorldPackSource.PLAYER_PACK_ID)
-            );
-        });
+        repository.setSelected(orderedIds);
+        try (var resources = new net.minecraft.server.packs.resources.MultiPackResourceManager(
+                PackType.SERVER_DATA, repository.openAllSelected())) {
+            acceptReload(new CreativeTabReloadListener(target.registryAccess()).prepareCatalog(resources));
+        }
+        if (defaultPresent) {
+            syncToAll(target, currentSnapshot());
+        }
+        VisualCreativeTabEditorConstants.LOGGER.debug(
+                "[EditorTrace] creative-tab-reload-complete defaultPresent={} baseTabs={} resolvedTabs={} "
+                        + "revision={} defaultSelected={} playerSelected={}",
+                defaultPresent,
+                base.orderedDefinitions().size(),
+                resolved.orderedDefinitions().size(),
+                REVISION.get(),
+                repository.getSelectedIds().contains(PinnedWorldPackSource.DEFAULT_PACK_ID),
+                repository.getSelectedIds().contains(PinnedWorldPackSource.PLAYER_PACK_ID)
+        );
+        return CompletableFuture.completedFuture(null);
     }
 
     private static List<String> pinnedReloadPackIds(PackRepository repository) {
@@ -724,12 +727,11 @@ public final class CreativeTabServerManager {
             for (CreativeModeTab tab : registryTabs) {
 // @target if minecraft_version=1.20.1
 //|                originalContents.put(tab, new NativeContents(
-//|                        copyDistinct(tab.getDisplayItems()),
+//|                        copyNativeStacks(tab.getDisplayItems(), true),
 //|                        copyDistinct(tab.getSearchTabDisplayItems())
 //|                ));
 // @target else
-                Set<ItemStack> displayItems = ItemStackLinkedSet.createTypeAndComponentsSet();
-                tab.getDisplayItems().forEach(stack -> displayItems.add(stack.copyWithCount(1)));
+                List<ItemStack> displayItems = copyNativeStacks(tab.getDisplayItems(), true);
                 Set<ItemStack> searchItems = ItemStackLinkedSet.createTypeAndComponentsSet();
                 tab.getSearchTabDisplayItems().forEach(stack -> searchItems.add(stack.copyWithCount(1)));
                 originalContents.put(tab, new NativeContents(displayItems, searchItems));
@@ -757,10 +759,10 @@ public final class CreativeTabServerManager {
                     int tabOrder = order++;
                     try {
                         List<ItemStack> items = tab.getType() == CreativeModeTab.Type.CATEGORY
-                                ? copyNativeStacks(tab.getDisplayItems())
+                                ? copyNativeStacks(tab.getDisplayItems(), true)
                                 : List.of();
                         List<ItemStack> searchItems = tab.getType() == CreativeModeTab.Type.CATEGORY
-                                ? copyNativeStacks(tab.getSearchTabDisplayItems())
+                                ? copyNativeStacks(tab.getSearchTabDisplayItems(), false)
                                 : List.of();
 // @target if minecraft_version=1.20.1
 //|                        ResourceLocation background = CreativeTabNativeBackground.resolve(tab);
@@ -810,11 +812,11 @@ public final class CreativeTabServerManager {
         });
     }
 
-    private static List<ItemStack> copyNativeStacks(Collection<ItemStack> stacks) {
+    private static List<ItemStack> copyNativeStacks(Collection<ItemStack> stacks, boolean includeEmptySlots) {
         List<ItemStack> result = new ArrayList<>(stacks.size());
         for (ItemStack stack : stacks) {
-            if (stack != null && !stack.isEmpty()) {
-                result.add(stack.copyWithCount(1));
+            if (stack != null && (includeEmptySlots || !stack.isEmpty())) {
+                result.add(stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
             }
         }
         return List.copyOf(result);
@@ -840,9 +842,8 @@ public final class CreativeTabServerManager {
         if (icon != null && !icon.isEmpty()) {
             return icon.copyWithCount(1);
         }
-        ItemStack fallback = !items.isEmpty()
-                ? items.get(0)
-                : !searchItems.isEmpty() ? searchItems.get(0) : new ItemStack(Items.BARRIER);
+        ItemStack fallback = items.stream().filter(stack -> !stack.isEmpty()).findFirst()
+                .orElseGet(() -> !searchItems.isEmpty() ? searchItems.get(0) : new ItemStack(Items.BARRIER));
         VisualCreativeTabEditorConstants.LOGGER.warn(
                 "Native creative tab {} supplied an empty icon; using {} as its data-driven fallback",
                 id,

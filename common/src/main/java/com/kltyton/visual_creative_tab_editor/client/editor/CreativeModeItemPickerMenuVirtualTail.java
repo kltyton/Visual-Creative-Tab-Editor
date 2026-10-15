@@ -7,4 +7,6 @@ public interface CreativeModeItemPickerMenuVirtualTail {
     void visualCreativeTabEditor$setVirtualTail(boolean enabled);
 
     boolean visualCreativeTabEditor$hasVirtualTail();
+
+    CreativeItemGroups visualCreativeTabEditor$itemGroups();
 }
