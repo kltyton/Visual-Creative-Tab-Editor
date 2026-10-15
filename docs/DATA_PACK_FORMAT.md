@@ -59,13 +59,17 @@ rebuilt global Search tab while preserving the tab identity.
 
 `title` uses Minecraft's component JSON. `icon`, `items`, and `search_items` use the
 Minecraft 26.2 `ItemStack` codec, so data components are preserved. Stack counts
-must be exactly one. For category tabs, `items` is the visible parent-tab list and
+must be exactly one. A category-tab `items` entry can also be `null` to reserve
+an empty display slot, such as a cell used by a native section banner. These
+slots retain their order through saving and synchronization and are excluded
+from item groups and search. For category tabs, `items` is the visible parent-tab list and
 `search_items` is its independent contribution to global search; this preserves
 Minecraft's parent-only and search-only entries.
 
 Layers merge field by field from low to high priority. A missing field inherits
 the lower value; a present field replaces it as a whole. Arrays are not appended,
-an empty array clears a list, and explicit `null` values are invalid.
+an empty array clears a list. A field cannot be `null`; the only nullable list
+entries are empty display slots inside a category-tab `items` array.
 
 Supported `type` values are:
 
@@ -81,11 +85,59 @@ retain their native behavior. In particular, `minecraft:hotbar`,
 preferred ordering: items not listed there, including items from newly installed
 mods, are appended automatically.
 
+## Item groups
+
+The optional `item_groups` field stores group definitions and exceptions to automatic grouping. It is supported by category and search tabs. Omitting the field preserves the lower-priority value; `{ "groups": [], "ungrouped": [] }` restores automatic grouping for the tab.
+
+```json
+{
+  "item_groups": {
+    "groups": [
+      {
+        "id": "custom/wooden_stairs",
+        "title": { "text": "Wooden stairs" },
+        "icon": { "id": "minecraft:oak_stairs", "count": 1 },
+        "items": [
+          { "id": "minecraft:oak_stairs", "count": 1 },
+          { "id": "minecraft:birch_stairs", "count": 1 }
+        ]
+      }
+    ],
+    "ungrouped": [
+      { "id": "minecraft:stone_stairs", "count": 1 }
+    ]
+  }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `groups[].id` | Stable identifier within the tab. The editor creates `custom/<uuid>` identifiers. |
+| `groups[].title` | Minecraft text component used as the group name. |
+| `groups[].icon` | Count-one icon stack; it need not be a member of the group. |
+| `groups[].items` | Member identities, including NBT or data components. At least one member is required. |
+| `ungrouped` | Items explicitly excluded from automatic grouping. |
+
+Explicit membership takes precedence over automatic classification. An item may appear in only one explicit group or in `ungrouped`. Group membership does not add items to the tab: only members present in the current tab view are displayed. Group definitions survive search filtering, and dissolving a group keeps its items.
+
+Automatic block groups use `block/<family>` identifiers, such as `block/stairs`. Item variants use `item/<namespace>:<path>`. These identifiers let name or icon overrides retain automatic collection of new matching items. Moving a complete group to another tab preserves it as a custom group.
+
+```mermaid
+flowchart LR
+    A[Tab item list] --> D[Visible group projection]
+    B[Explicit groups] --> D
+    C[Ungrouped exceptions] --> D
+    D --> E[Representative icon and expandable members]
+```
+
+The client option `config/visual_creative_tab_editor/client.json` controls whether groups are displayed. Setting `group_similar_items` to `false` retains the saved definitions and shows the original flat list after a client restart. Client and server must use the same mod version for shared layout editing.
+
 ## Limits and failure behavior
 
 - 512 tabs per resolved catalog.
-- 16384 stacks in `items` and 16384 stacks in `search_items` per tab, with 65536
+- 262144 stacks in `items` and 262144 stacks in `search_items` per tab, with 2097152
   configured stacks total across the catalog.
+- Group members and ungrouped exceptions have a separate combined limit of 262144 references per tab and 2097152 across the catalog.
 - Unknown fields, invalid identifiers, empty stacks, invalid components, and
   unsupported schema versions fail the resource reload.
 - Stale entries in the two reserved, Mod-owned world packs are skipped instead
@@ -93,8 +145,8 @@ mods, are appended automatically.
   pack is regenerated at server start; third-party packs remain strictly
   validated.
 - A resolved catalog must retain at least one visible category tab.
-- The combined base-and-resolved network snapshot must fit within 16 MiB
-  expanded and 4 MiB compressed; an oversized resource reload is rejected.
+- The combined base-and-resolved network snapshot must fit within 128 MiB
+  expanded and 16 MiB compressed; an oversized resource reload is rejected.
 
 On reload failure Minecraft retains the previous valid resource state. The
 visual editor additionally uses a revision number so two administrators cannot
