@@ -74,7 +74,9 @@ public final class CreativeTabRuntime {
         State previous = PREVIEW.get();
         PREVIEW.remove();
         PREVIEW_HANDOFF.set(null);
-        refreshKnownContents(previous);
+        if (previous != null) {
+            refreshKnownContents(previous);
+        }
     }
 
     /** Makes custom preview-tab identities available to the next server snapshot. */
