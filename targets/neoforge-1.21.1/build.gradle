@@ -4,13 +4,12 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.49-beta'
 }
 apply from: file('../../gradle/target-conventions/base.gradle')
-apply from: file('../../gradle/target-conventions/shared-java.gradle')
 
 
 neoForge {
     version = neoforge_version
     // Automatically enable neoforge AccessTransformers if the file exists
-    def at = file("../../versions/1.21.1/" + 'src/main/resources/META-INF/accesstransformer.cfg')
+    def at = file("../../common/src/compat/minecraft/1.21.1/" + 'resources/META-INF/accesstransformer.cfg')
     if (at.exists()) {
         accessTransformers.from(at.absolutePath)
     }
@@ -45,6 +44,7 @@ neoForge {
     mods {
         "${mod_id}" {
             sourceSet sourceSets.main
+            sourceSet project(':common').sourceSets.main
         }
     }
 }

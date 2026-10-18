@@ -18,3 +18,15 @@ fabricApi.configureDataGeneration {
     client = true
 }
 apply from: file('../../gradle/target-conventions/publish.gradle')
+
+loom {
+    accessWidenerPath.set(file("../../common/src/compat/minecraft/${minecraft_version}/resources/${mod_id}." +
+            ((java_version as int) >= 25 ? 'classtweaker' : 'accesswidener')))
+    if ((java_version as int) < 25) { mixin { defaultRefmapName.set("${mod_id}.refmap.json") } }
+    mods { "${mod_id}" {
+        sourceSet sourceSets.main
+        sourceSet project(':common').sourceSets.main, project(':common')
+    } }
+}
+sourceSets.main.runtimeClasspath += project(':common').sourceSets.main.output
+if ((java_version as int) < 25) apply from: file('../../gradle/target-conventions/fabric-common-mixin.gradle')

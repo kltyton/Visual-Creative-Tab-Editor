@@ -3,10 +3,6 @@ package com.kltyton.visual_creative_tab_editor.client;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
-// @target if minecraft_version=26.1.2,26.2
-// @target else
-import net.minecraft.client.Minecraft;
-// @target end
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -28,11 +24,7 @@ public final class CreativeTabClientPlatform {
             screen -> CreativeModeTabs.tabs()
     );
     private static final AtomicReference<ScreenRefresher> SCREEN_REFRESHER = new AtomicReference<>(
-// @target if minecraft_version=26.1.2,26.2
-//|            screen -> screen.resize(screen.width, screen.height)
-// @target else
-            screen -> screen.resize(Minecraft.getInstance(), screen.width, screen.height)
-// @target end
+            com.kltyton.visual_creative_tab_editor.client.platform.NativeScreenLifecycle::refresh
     );
     private static final AtomicReference<Runnable> TAB_LAYOUT_REFRESHER = new AtomicReference<>(() -> { });
     private static final AtomicReference<TabRevealer> TAB_REVEALER = new AtomicReference<>((screen, tab) -> true);

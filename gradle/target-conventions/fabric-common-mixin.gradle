@@ -1,0 +1,35 @@
+def mappingServiceType = project.ext.templeMixinMappingServiceType
+def tinyRemapperServiceClass = project.ext.templeTinyRemapperServiceClass
+
+// Loom 1.9/1.10 owns the mappings; the common Java task owns its AP outputs.
+afterEvaluate {
+    def commonProject = project(':common')
+    def commonCompile = commonProject.tasks.named('compileJava', JavaCompile)
+    def targetCompile = tasks.named('compileJava', JavaCompile).get()
+    def tiny = commonProject.layout.buildDirectory.file('mixin/mixin-map-common.main.tiny').get().asFile
+    def refmap = commonCompile.get().destinationDirectory.file("${mod_id}.refmap.json").get().asFile
+    def args = targetCompile.options.compilerArgs.findAll { it.startsWith('-A') }.collect { arg ->
+        if (arg.startsWith('-AoutMapFileNamedIntermediary=')) return "-AoutMapFileNamedIntermediary=${tiny.absolutePath}".toString()
+        if (arg.startsWith('-AoutRefMapFile=')) return "-AoutRefMapFile=${refmap.absolutePath}".toString()
+        arg.toString()
+    }
+    commonCompile.configure {
+        options.compilerArgs.addAll(args)
+        outputs.file(tiny)
+        doFirst { tiny.parentFile.mkdirs() }
+    }
+    tasks.named('remapJar').configure { remapTask ->
+        dependsOn commonCompile
+        def commonMappings = mappingServiceType.create(project) { options ->
+            options.compileOutputs.from(commonCompile)
+            options.mixinMappingFileName.set(tiny.name)
+            options.from.set(remapTask.sourceNamespace)
+            options.to.set(remapTask.targetNamespace)
+        }
+        remapTask.tinyRemapperServiceOptions.set(
+                tinyRemapperServiceClass.createOptions(remapTask).map { options ->
+                    options.mixinApMappings.add(commonMappings)
+                    options
+                })
+    }
+}

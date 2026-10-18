@@ -1,0 +1,31 @@
+{
+  "required": true,
+  "mixinPriority": 2000,
+  "minVersion": "0.8",
+  "package": "com.kltyton.visual_creative_tab_editor.mixin",
+  "refmap": "${mod_id}.refmap.json",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "CreativeModeTabMixin",
+    "NativeTabBackgroundMixin",
+    "CreativeModeTabsMixin",
+    "PackRepositoryMixin",
+    "ServerPacksSourceMixin"
+  ],
+  "client": [
+    "client.ScreenEditorOverlayMixin",
+    "client.EditBoxTextShadowMixin",
+    "client.AbstractContainerScreenTooltipMixin",
+    "client.CreativeModeInventoryScreenEditorMixin",
+    "client.NativeCreativeLayoutMixin",
+    "client.CreativeModeItemPickerMenuVirtualTailMixin",
+    "client.AbstractContainerScreenItemGroupMixin",
+    "client.NativeEditorInputMixin",
+    "client.NativeEditorScrollMixin",
+    "client.NativeCreativeBackgroundMixin"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

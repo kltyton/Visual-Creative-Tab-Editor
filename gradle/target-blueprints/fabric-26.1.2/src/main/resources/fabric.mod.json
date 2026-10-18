@@ -4,15 +4,29 @@
   "version": "${mod_version}",
   "name": "${mod_name}",
   "description": "${mod_description}",
-  "authors": ["${mod_authors}"],
+  "authors": [
+    "${mod_authors}"
+  ],
   "license": "${mod_license}",
   "environment": "*",
   "entrypoints": {
-    "main": ["${mod_group_id}.TempleFabric"]
+    "main": [
+      "${mod_java_package}.VisualCreativeTabEditor"
+    ],
+    "client": [
+      "${mod_java_package}.VisualCreativeTabEditorClient"
+    ]
   },
   "depends": {
     "fabricloader": "${loader_version_range}",
     "minecraft": "=${minecraft_version}",
-    "java": ">=${java_version}"
-  }
+    "java": ">=${java_version}",
+    "fabric-api": "${fabric_api_version}"
+  },
+  "mixins": [
+    "${mod_id}.mixins.json",
+    "${mod_id}.fabric.mixins.json"
+  ],
+  "accessWidener": "${mod_id}.classtweaker",
+  "icon": "assets/${mod_id}/icon.png"
 }

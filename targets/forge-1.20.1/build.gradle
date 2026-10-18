@@ -4,12 +4,9 @@ plugins {
     id 'net.neoforged.moddev.legacyforge' version '2.0.77'
 }
 apply from: file('../../gradle/target-conventions/base.gradle')
-apply from: file('../../gradle/target-conventions/shared-java.gradle')
 
 
 mixin {
-    add(sourceSets.main, "${mod_id}.refmap.json")
-
     config("${mod_id}.mixins.json")
     config("${mod_id}.forge.mixins.json")
 }
@@ -46,6 +43,7 @@ legacyForge {
     mods {
         "${mod_id}" {
             sourceSet sourceSets.main
+            sourceSet project(':common').sourceSets.main
         }
     }
 }
@@ -73,3 +71,4 @@ jar {
 }
 
 apply from: file('../../gradle/target-conventions/publish.gradle')
+apply from: file('../../gradle/target-conventions/forge-common-mixin.gradle')

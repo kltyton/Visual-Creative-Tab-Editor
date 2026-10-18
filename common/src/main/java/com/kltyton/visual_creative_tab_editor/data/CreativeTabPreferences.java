@@ -16,7 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 
 /** Local default template and per-server preferences, stored as patches against native tabs. */
 public final class CreativeTabPreferences {
@@ -60,11 +60,11 @@ public final class CreativeTabPreferences {
             if (entries.size() > CreativeTabValidation.MAX_TABS) {
                 throw new IllegalArgumentException("Too many creative tab preference entries");
             }
-            Map<ResourceLocation, CreativeTabDefinition> definitions = new LinkedHashMap<>(baseline.definitions());
-            java.util.Set<ResourceLocation> seen = new java.util.HashSet<>();
+            Map<ResourceId, CreativeTabDefinition> definitions = new LinkedHashMap<>(baseline.definitions());
+            java.util.Set<ResourceId> seen = new java.util.HashSet<>();
             for (var element : entries) {
                 JsonObject entry = element.getAsJsonObject();
-                ResourceLocation id = ResourceLocation.tryParse(entry.get("id").getAsString());
+                ResourceId id = ResourceId.tryParse(entry.get("id").getAsString());
                 if (id == null || !seen.add(id)) {
                     throw new IllegalArgumentException("Invalid or duplicate creative tab preference id");
                 }

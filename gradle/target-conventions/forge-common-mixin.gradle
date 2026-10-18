@@ -1,0 +1,14 @@
+// Preserve the plugin's mapping consumers while moving its AP producer to common.
+def targetCompile = tasks.named('compileJava', JavaCompile).get()
+def commonCompile = project(':common').tasks.named('compileJava', JavaCompile)
+def before = targetCompile.options.compilerArgumentProviders.toList()
+extensions.getByName('mixin').add(sourceSets.main, "${mod_id}.refmap.json")
+def added = targetCompile.options.compilerArgumentProviders.findAll { candidate ->
+    !before.any { previous -> previous.is(candidate) }
+}
+if (added.size() != 1) {
+    throw new GradleException("Expected one native Mixin compiler argument provider, found ${added.size()}")
+}
+targetCompile.options.compilerArgumentProviders.removeAll(added)
+commonCompile.configure { options.compilerArgumentProviders.addAll(added) }
+tasks.named('jar').configure { dependsOn commonCompile }

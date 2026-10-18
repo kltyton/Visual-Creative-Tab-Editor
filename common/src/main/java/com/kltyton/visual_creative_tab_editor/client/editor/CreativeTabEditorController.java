@@ -2,6 +2,9 @@ package com.kltyton.visual_creative_tab_editor.client.editor;
 
 import com.kltyton.visual_creative_tab_editor.client.config.CreativeTabClientConfig;
 import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGroup;
+import com.kltyton.visual_creative_tab_editor.client.editor.category.CreativeTabCategoryBrowser;
+import com.kltyton.visual_creative_tab_editor.client.editor.category.CreativeTabCategorySidebar;
+import com.kltyton.visual_creative_tab_editor.data.category.CreativeTabCategory;
 import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import com.kltyton.visual_creative_tab_editor.client.CreativeTabClientPlatform;
 import com.kltyton.visual_creative_tab_editor.client.CreativeTabClientState;
@@ -11,10 +14,6 @@ import com.kltyton.visual_creative_tab_editor.data.CreativeTabType;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabValidation;
 import com.kltyton.visual_creative_tab_editor.network.EditResultPayload;
 import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
-// @target if minecraft_version=1.20.1
-//|import com.mojang.blaze3d.systems.RenderSystem;
-// @target else
-// @target end
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -25,44 +24,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-// @target if minecraft_version=1.20.1
-//|import javax.annotation.Nullable;
-//|import net.minecraft.Util;
-// @target elif minecraft_version=26.1.2,26.2
-// @target else
-import org.jetbrains.annotations.Nullable;
-// @target end
-import net.minecraft.client.gui.GuiGraphics;
-// @target if minecraft_version=26.1.2,26.2
-//|import net.minecraft.client.input.CharacterEvent;
-//|import net.minecraft.client.input.KeyEvent;
-//|import net.minecraft.client.input.MouseButtonEvent;
-//|import net.minecraft.client.input.PreeditEvent;
-//|import net.minecraft.client.renderer.RenderPipelines;
-// @target else
-// @target end
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorGraphics;
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorTheme;
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorTheme.Tone;
+import com.kltyton.visual_creative_tab_editor.client.editor.layout.CreativeTabEditorToolbar;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Character;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Key;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Pointer;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Preedit;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 import net.minecraft.util.Mth;
-// @target if minecraft_version=1.20.1
-// @target else
-import net.minecraft.Util;
-// @target end
-import net.minecraft.world.inventory.ClickType;
+import com.kltyton.visual_creative_tab_editor.platform.time.NativeClock;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.SlotInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
-// @target if minecraft_version=26.1.2,26.2
-// @target else
-import net.minecraft.world.item.Item;
-// @target end
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackLinkedSet;
-// @target if minecraft_version=26.1.2,26.2
-//|import net.minecraft.world.item.Item;
-//|import org.jetbrains.annotations.Nullable;
-// @target else
-// @target end
+import net.minecraft.world.item.Item;
+import javax.annotation.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 /** State machine for the phone-home-screen style creative-tab editor. */
@@ -76,59 +57,37 @@ public final class CreativeTabEditorController {
     private static final int BUTTON_WIDTH = 44;
     private static final int ORDINARY_TABS_PER_PAGE = 10;
     private static final int ORDINARY_TABS_PER_ROW = 5;
-// @target if minecraft_version=1.20.1
-//|    private static final ResourceLocation CREATIVE_TABS_LOCATION = new ResourceLocation(
-//|            "textures/gui/container/creative_inventory/tabs.png"
-//|    );
-// @target else
-// @target end
-    private static final Set<ResourceLocation> COMMON_TAB_IDS = Set.of(
-// @target if minecraft_version=1.20.1
-//|            new ResourceLocation("hotbar"),
-//|            new ResourceLocation("search"),
-//|            new ResourceLocation("op_blocks"),
-//|            new ResourceLocation("inventory")
-// @target else
-            ResourceLocation.withDefaultNamespace("hotbar"),
-            ResourceLocation.withDefaultNamespace("search"),
-            ResourceLocation.withDefaultNamespace("op_blocks"),
-            ResourceLocation.withDefaultNamespace("inventory")
-// @target end
+    private static final Set<ResourceId> COMMON_TAB_IDS = Set.of(
+            ResourceId.withDefaultNamespace("hotbar"),
+            ResourceId.withDefaultNamespace("search"),
+            ResourceId.withDefaultNamespace("op_blocks"),
+            ResourceId.withDefaultNamespace("inventory")
     );
-    private static final List<ResourceLocation> SEMANTIC_CATEGORY_ORDER = List.of(
-// @target if minecraft_version=1.20.1
-//|            new ResourceLocation("building_blocks"),
-//|            new ResourceLocation("colored_blocks"),
-//|            new ResourceLocation("natural_blocks"),
-//|            new ResourceLocation("functional_blocks"),
-//|            new ResourceLocation("redstone_blocks"),
-//|            new ResourceLocation("tools_and_utilities"),
-//|            new ResourceLocation("combat"),
-//|            new ResourceLocation("food_and_drinks"),
-//|            new ResourceLocation("ingredients"),
-//|            new ResourceLocation("spawn_eggs")
-// @target else
-            ResourceLocation.withDefaultNamespace("building_blocks"),
-            ResourceLocation.withDefaultNamespace("colored_blocks"),
-            ResourceLocation.withDefaultNamespace("natural_blocks"),
-            ResourceLocation.withDefaultNamespace("functional_blocks"),
-            ResourceLocation.withDefaultNamespace("redstone_blocks"),
-            ResourceLocation.withDefaultNamespace("tools_and_utilities"),
-            ResourceLocation.withDefaultNamespace("combat"),
-            ResourceLocation.withDefaultNamespace("food_and_drinks"),
-            ResourceLocation.withDefaultNamespace("ingredients"),
-            ResourceLocation.withDefaultNamespace("spawn_eggs")
-// @target end
+    private static final List<ResourceId> SEMANTIC_CATEGORY_ORDER = List.of(
+            ResourceId.withDefaultNamespace("building_blocks"),
+            ResourceId.withDefaultNamespace("colored_blocks"),
+            ResourceId.withDefaultNamespace("natural_blocks"),
+            ResourceId.withDefaultNamespace("functional_blocks"),
+            ResourceId.withDefaultNamespace("redstone_blocks"),
+            ResourceId.withDefaultNamespace("tools_and_utilities"),
+            ResourceId.withDefaultNamespace("combat"),
+            ResourceId.withDefaultNamespace("food_and_drinks"),
+            ResourceId.withDefaultNamespace("ingredients"),
+            ResourceId.withDefaultNamespace("spawn_eggs")
     );
 
     private final CreativeTabEditorHost host;
     private final CreativeTabFolderBrowser folders;
+    private final CreativeTabCategoryBrowser categories;
+    private final CreativeTabCategorySidebar categorySidebar;
+    private @Nullable String contextCategoryId;
+    private boolean groupConfigFailed;
     private Mode mode = Mode.NORMAL;
     private @Nullable CreativeTabDraft draft;
     private @Nullable CreativeTabHistory history;
     private boolean dragCheckpointed;
     private @Nullable Press press;
-    private @Nullable ResourceLocation contextTabId;
+    private @Nullable ResourceId contextTabId;
     private int contextItemIndex = -1;
     private int contextX;
     private int contextY;
@@ -136,21 +95,18 @@ public final class CreativeTabEditorController {
     private int contextTargetY;
     private @Nullable CreativeModeTab pickerReturnTab;
     private int pickerReturnScrollRow;
-    private @Nullable ResourceLocation editorEntryTabId;
+    private @Nullable ResourceId editorEntryTabId;
     private boolean replayingSlotClick;
     private boolean nativeReleaseCleanup;
     private boolean nativeReleaseAllowsAction;
-// @target if minecraft_version=26.1.2,26.2
-//|    private boolean currentClickDouble;
-// @target else
-// @target end
+    private boolean currentClickDouble;
     private @Nullable Press pendingSlotReplay;
     private @Nullable Mode saveReturnMode;
     private @Nullable String titleEditorInitialValue;
     private @Nullable DragVisual dragVisual;
     private @Nullable CreativeModeTab pendingNativeTabSelection;
     private @Nullable CreativeModeTab nativeTabSelectionBefore;
-    private @Nullable ResourceLocation itemDragHoverTabId;
+    private @Nullable ResourceId itemDragHoverTabId;
     private long itemDragHoverStartedAt;
     private boolean itemDragHoverBlockedLogged;
     private long draftRevision = -1L;
@@ -167,12 +123,23 @@ public final class CreativeTabEditorController {
     private @Nullable String contextMemberGroupId;
     private ItemStack contextGroupIcon = ItemStack.EMPTY;
     private @Nullable String focusedGroupId;
-    private @Nullable ResourceLocation focusedGroupTabId;
+    private @Nullable ResourceId focusedGroupTabId;
     private Component groupControlTitle = Component.empty();
 
     public CreativeTabEditorController(CreativeTabEditorHost host) {
         this.host = Objects.requireNonNull(host, "host");
+        this.categories = new CreativeTabCategoryBrowser(host, () -> itemGroups().categoryFilter(),
+                this::canEditCategories,
+                () -> this.draft != null && draft().selectedItemCount() > 0,
+                this::refreshCategoryView, this::editCategory, () -> toolbar().secondary(1));
+        this.categorySidebar = new CreativeTabCategorySidebar(host, () -> itemGroups().categoryFilter(),
+                this::canEditCategories, this::refreshCategoryView,
+                () -> editCategory(CreativeTabCategoryBrowser.Action.NEW, null), this.categories::focus);
         this.folders = new CreativeTabFolderBrowser(host, this::pickFolderItem);
+    }
+
+    private boolean canEditCategories() {
+        return this.mode == Mode.EDIT && currentType() == CreativeTabType.CATEGORY && screenMatchesDraftCurrentTab();
     }
 
     private void pickFolderItem(int originalIndex, int button, boolean quickMove) {
@@ -189,7 +156,7 @@ public final class CreativeTabEditorController {
         this.replayingSlotClick = true;
         try {
             this.host.visualCreativeTabEditor$replaySlotClick(slot, slot.index, button,
-                    quickMove ? ClickType.QUICK_MOVE : ClickType.PICKUP);
+                    quickMove ? SlotInput.QUICK_MOVE : SlotInput.PICKUP);
         } finally { this.replayingSlotClick = false; }
     }
 
@@ -204,36 +171,35 @@ public final class CreativeTabEditorController {
         updateVirtualTail("screen-init");
         if (this.mode == Mode.TAB_PROPERTIES) {
             this.host.visualCreativeTabEditor$showTitleEditor(
-                    this.contextGroupId == null ? draft().definition(requireContextTab()).orElseThrow().title().getString()
+                    this.contextCategoryId != null ? draft().category(this.contextCategoryId).title().getString()
+                            : this.contextGroupId == null ? draft().definition(requireContextTab()).orElseThrow().title().getString()
                             : draft().itemGroup(this.contextGroupId).title().getString()
             );
         }
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-// @target else
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-// @target end
+    public boolean mouseClicked(Pointer event, boolean doubleClick) {
         this.dragCheckpointed = false;
-// @target if minecraft_version=26.1.2,26.2
-//|        this.pointerX = event.x();
-//|        this.pointerY = event.y();
-//|        this.currentClickDouble = doubleClick;
-//|        if (this.mode == Mode.NORMAL && this.folders.click(event.x(), event.y(), event.button(), event.hasShiftDown())) {
-// @target else
-        this.pointerX = mouseX;
-        this.pointerY = mouseY;
-        if (this.mode == Mode.NORMAL && this.folders.click(mouseX, mouseY, button, net.minecraft.client.gui.screens.Screen.hasShiftDown())) {
-// @target end
+        this.pointerX = event.x();
+        this.pointerY = event.y();
+        this.currentClickDouble = doubleClick;
+        if ((this.mode == Mode.NORMAL || this.mode == Mode.EDIT)
+                && !this.categories.isOpen() && !this.folders.isOpen()
+                && this.categorySidebar.click(event.x(), event.y(), event.button(), event.hasShiftDown())) {
             this.press = null;
             return true;
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        if (event.button() != 0) {
-// @target else
-        if (button != 0) {
-// @target end
+        if ((this.mode == Mode.NORMAL || this.mode == Mode.EDIT)
+                && this.categories.click(event.x(), event.y(), event.button(), event.hasShiftDown())) {
+            this.folders.close();
+            this.press = null;
+            return true;
+        }
+        if (this.mode == Mode.NORMAL && this.folders.click(event.x(), event.y(), event.button(), event.hasShiftDown())) {
+            this.press = null;
+            return true;
+        }
+        if (event.button() != 0) {
             return isModal();
         }
         if ((this.mode == Mode.NORMAL || this.mode == Mode.EDIT || isPicker())
@@ -242,32 +208,17 @@ public final class CreativeTabEditorController {
         }
         if (this.mode == Mode.NORMAL) {
             if (!CreativeTabClientState.canEdit()) {
-// @target if minecraft_version=26.1.2,26.2
-//|                trace("mouse-down rejected mode={} x={} y={} reason=no-edit-permission", this.mode, event.x(), event.y());
-// @target else
-                trace("mouse-down rejected mode={} x={} y={} reason=no-edit-permission", this.mode, mouseX, mouseY);
-// @target end
+                trace("mouse-down rejected mode={} x={} y={} reason=no-edit-permission", this.mode, event.x(), event.y());
                 return false;
             }
-// @target if minecraft_version=26.1.2,26.2
-//|            CreativeModeTab tab = tabAt(event.x(), event.y());
-//|            boolean inTabStrip = isInTabStrip(event.x(), event.y());
-//|            boolean blankFrame = tab == null && isBlankEditorEntryArea(event.x(), event.y());
-// @target else
-            CreativeModeTab tab = tabAt(mouseX, mouseY);
-            boolean inTabStrip = isInTabStrip(mouseX, mouseY);
-            boolean blankFrame = tab == null && isBlankEditorEntryArea(mouseX, mouseY);
-// @target end
+            CreativeModeTab tab = tabAt(event.x(), event.y());
+            boolean inTabStrip = isInTabStrip(event.x(), event.y());
+            boolean blankFrame = tab == null && isBlankEditorEntryArea(event.x(), event.y());
             trace(
                     "mouse-down mode={} x={} y={} tab={} tabShouldDisplay={} inTabStrip={} blankFrame={} pageTabs={} left={} top={} image={}x{}",
                     this.mode,
-// @target if minecraft_version=26.1.2,26.2
-//|                    event.x(),
-//|                    event.y(),
-// @target else
-                    mouseX,
-                    mouseY,
-// @target end
+                    event.x(),
+                    event.y(),
                     tabId(tab),
                     tab == null ? "-" : tab.shouldDisplay(),
                     inTabStrip,
@@ -279,21 +230,13 @@ public final class CreativeTabEditorController {
                     this.host.visualCreativeTabEditor$imageHeight()
             );
             if (tab != null) {
-// @target if minecraft_version=26.1.2,26.2
-//|                this.press = Press.tab(PressKind.NORMAL_TAB, tab, event.x(), event.y());
-// @target else
-                this.press = Press.tab(PressKind.NORMAL_TAB, tab, mouseX, mouseY);
-// @target end
+                this.press = Press.tab(PressKind.NORMAL_TAB, tab, event.x(), event.y());
                 tracePressStart(this.press);
                 trace("tab-click-down delegated-to-native tab={}", tabId(tab));
                 return false;
             }
             if (blankFrame) {
-// @target if minecraft_version=26.1.2,26.2
-//|                this.press = Press.blank(event.x(), event.y());
-// @target else
-                this.press = Press.blank(mouseX, mouseY);
-// @target end
+                this.press = Press.blank(event.x(), event.y());
                 tracePressStart(this.press);
                 return true;
             }
@@ -303,37 +246,21 @@ public final class CreativeTabEditorController {
             return true;
         }
         if (this.mode == Mode.CONFLICT) {
-// @target if minecraft_version=26.1.2,26.2
-//|            if (buttonAt(event.x(), event.y(), cancelRect())) {
-// @target else
-            if (buttonAt(mouseX, mouseY, cancelRect())) {
-// @target end
+            if (buttonAt(event.x(), event.y(), cancelRect())) {
                 cancelAndExit();
             }
             return true;
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        if (isModal() && buttonAt(event.x(), event.y(), saveRect())) {
-// @target else
-        if (isModal() && buttonAt(mouseX, mouseY, saveRect())) {
-// @target end
+        if (isModal() && buttonAt(event.x(), event.y(), saveRect())) {
             saveAndExit();
             return true;
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        if (isModal() && buttonAt(event.x(), event.y(), cancelRect())) {
-// @target else
-        if (isModal() && buttonAt(mouseX, mouseY, cancelRect())) {
-// @target end
+        if (isModal() && buttonAt(event.x(), event.y(), cancelRect())) {
             cancelAndExit();
             return true;
         }
         if (isPicker()) {
-// @target if minecraft_version=26.1.2,26.2
-//|            if (slotAt(event.x(), event.y()) == null && !buttonAt(event.x(), event.y(), cancelRect())) {
-// @target else
-            if (slotAt(mouseX, mouseY) == null && !buttonAt(mouseX, mouseY, cancelRect())) {
-// @target end
+            if (slotAt(event.x(), event.y()) == null && !buttonAt(event.x(), event.y(), cancelRect())) {
                 saveAndExit();
                 return true;
             }
@@ -343,70 +270,36 @@ public final class CreativeTabEditorController {
             return clickGroupControls(this.pointerX, this.pointerY);
         }
         if (this.mode == Mode.TAB_PROPERTIES) {
-// @target if minecraft_version=26.1.2,26.2
-//|            return clickTabProperties(event.x(), event.y());
-// @target else
-            return clickTabProperties(mouseX, mouseY);
-// @target end
+            return clickTabProperties(event.x(), event.y());
         }
         if (this.mode == Mode.SORT_MENU) {
-// @target if minecraft_version=26.1.2,26.2
-//|            return clickSortMenu(event.x(), event.y());
-// @target else
-            return clickSortMenu(mouseX, mouseY);
-// @target end
+            return clickSortMenu(event.x(), event.y());
         }
         if (this.mode == Mode.CONTEXT_TAB || this.mode == Mode.CONTEXT_ITEM) {
-// @target if minecraft_version=26.1.2,26.2
-//|            return clickContextMenu(event.x(), event.y());
-// @target else
-            return clickContextMenu(mouseX, mouseY);
-// @target end
+            return clickContextMenu(event.x(), event.y());
         }
         if ((this.mode == Mode.EDIT || this.mode == Mode.DRAG_TABS || this.mode == Mode.DRAG_ITEMS)
-// @target if minecraft_version=26.1.2,26.2
-//|                && clickControl(event.x(), event.y())) {
-// @target else
-                && clickControl(mouseX, mouseY)) {
-// @target end
+                && clickControl(event.x(), event.y())) {
             return true;
         }
         if ((this.mode == Mode.EDIT || this.mode == Mode.DRAG_TABS || this.mode == Mode.DRAG_ITEMS)
-// @target if minecraft_version=26.1.2,26.2
-//|                && this.host.visualCreativeTabEditor$isPageButtonAt(event.x(), event.y())) {
-// @target else
-                && this.host.visualCreativeTabEditor$isPageButtonAt(mouseX, mouseY)) {
-// @target end
+                && this.host.visualCreativeTabEditor$isPageButtonAt(event.x(), event.y())) {
             return false;
         }
         if ((this.mode == Mode.EDIT || this.mode == Mode.DRAG_TABS || this.mode == Mode.DRAG_ITEMS)
-// @target if minecraft_version=26.1.2,26.2
-//|                && isCreativeScrollbarAt(event.x(), event.y())) {
-// @target else
-                && isCreativeScrollbarAt(mouseX, mouseY)) {
-// @target end
+                && isCreativeScrollbarAt(event.x(), event.y())) {
             return false;
         }
         if (this.mode == Mode.EDIT || this.mode == Mode.DRAG_TABS || this.mode == Mode.DRAG_ITEMS) {
             TabPlusTarget tabPlus = tabPlusTarget();
             Rect itemPlus = currentType() == CreativeTabType.CATEGORY ? itemPlusRect() : null;
-// @target if minecraft_version=26.1.2,26.2
-//|            boolean tabPlusHit = tabPlus != null && tabPlus.hitRect().contains(event.x(), event.y());
-//|            boolean itemPlusHit = itemPlus != null && itemPlus.contains(event.x(), event.y());
-// @target else
-            boolean tabPlusHit = tabPlus != null && tabPlus.hitRect().contains(mouseX, mouseY);
-            boolean itemPlusHit = itemPlus != null && itemPlus.contains(mouseX, mouseY);
-// @target end
+            boolean tabPlusHit = tabPlus != null && tabPlus.hitRect().contains(event.x(), event.y());
+            boolean itemPlusHit = itemPlus != null && itemPlus.contains(event.x(), event.y());
             trace(
                     "edit-click mode={} x={} y={} tabPlusHit={} tabPlusHitRect={} tabPlusSpriteRect={} tabPlusRow={} tabPlusColumn={} tabPlusExternal={} itemPlusHit={} itemPlusRect={} currentTab={} currentItems={}",
                     this.mode,
-// @target if minecraft_version=26.1.2,26.2
-//|                    event.x(),
-//|                    event.y(),
-// @target else
-                    mouseX,
-                    mouseY,
-// @target end
+                    event.x(),
+                    event.y(),
                     tabPlusHit,
                     tabPlus == null ? null : tabPlus.hitRect(),
                     tabPlus == null ? null : tabPlus.spriteRect(),
@@ -426,29 +319,17 @@ public final class CreativeTabEditorController {
                 beginPicker(Mode.PICK_NEW_ITEM);
                 return true;
             }
-// @target if minecraft_version=26.1.2,26.2
-//|            CreativeModeTab tab = tabAt(event.x(), event.y());
-// @target else
-            CreativeModeTab tab = tabAt(mouseX, mouseY);
-// @target end
+            CreativeModeTab tab = tabAt(event.x(), event.y());
             if (tab != null) {
-                ResourceLocation id = CreativeTabRuntime.id(tab).orElse(null);
+                ResourceId id = CreativeTabRuntime.id(tab).orElse(null);
                 if (id != null) {
-// @target if minecraft_version=26.1.2,26.2
-//|                    this.press = Press.tab(PressKind.EDIT_TAB, tab, event.x(), event.y());
-// @target else
-                    this.press = Press.tab(PressKind.EDIT_TAB, tab, mouseX, mouseY);
-// @target end
+                    this.press = Press.tab(PressKind.EDIT_TAB, tab, event.x(), event.y());
                     this.contextTabId = id;
                     tracePressStart(this.press);
                     return true;
                 }
             }
-// @target if minecraft_version=26.1.2,26.2
-//|            Slot slot = creativeSlotAt(event.x(), event.y());
-// @target else
-            Slot slot = creativeSlotAt(mouseX, mouseY);
-// @target end
+            Slot slot = creativeSlotAt(event.x(), event.y());
             if (slot != null && slot.hasItem() && canReorderCurrentItems()) {
                 ensureSearchOrderPrepared(this.host.visualCreativeTabEditor$selectedTab(), "edit-item-press");
                 int itemIndex = itemIndexForSlot(slot);
@@ -467,11 +348,7 @@ public final class CreativeTabEditorController {
                 );
                 if (accepted) {
                     this.contextItemIndex = itemIndex;
-// @target if minecraft_version=26.1.2,26.2
-//|                    this.press = Press.item(PressKind.EDIT_ITEM, slot, itemIndex, event.x(), event.y());
-// @target else
-                    this.press = Press.item(PressKind.EDIT_ITEM, slot, itemIndex, mouseX, mouseY);
-// @target end
+                    this.press = Press.item(PressKind.EDIT_ITEM, slot, itemIndex, event.x(), event.y());
                     tracePressStart(this.press);
                     return true;
                 }
@@ -483,8 +360,8 @@ public final class CreativeTabEditorController {
         return isEditing();
     }
 
-    public boolean slotClicked(@Nullable Slot slot, int slotId, int button, ClickType input) {
-        if (this.folders.isOpen()) { return true; }
+    public boolean slotClicked(@Nullable Slot slot, int slotId, int button, SlotInput input) {
+        if (this.folders.isOpen() || this.categories.isOpen()) { return true; }
         boolean creativeSlot = slot != null && this.host.visualCreativeTabEditor$isCreativeSlot(slot);
         if (creativeSlot && itemGroups().isHeader(displayItemIndex(slot))) {
             return true;
@@ -515,7 +392,7 @@ public final class CreativeTabEditorController {
         if (this.mode == Mode.NORMAL
                 && CreativeTabClientState.canEdit()
                 && button == 0
-                && input == ClickType.PICKUP
+                && input == SlotInput.PICKUP
                 && creativeSlot
                 && slot != null
                 && slot.hasItem()
@@ -541,7 +418,7 @@ public final class CreativeTabEditorController {
         if (this.mode == Mode.NORMAL
                 && CreativeTabClientState.canEdit()
                 && button == 0
-                && input == ClickType.PICKUP
+                && input == SlotInput.PICKUP
                 && slot != null
                 && this.host.visualCreativeTabEditor$isCreativeSlot(slot)
                 && slot.hasItem()
@@ -555,12 +432,8 @@ public final class CreativeTabEditorController {
                     input,
                     absolute,
                     this.pointerX,
-// @target if minecraft_version=26.1.2,26.2
-//|                    this.pointerY,
-//|                    this.currentClickDouble
-// @target else
-                    this.pointerY
-// @target end
+                    this.pointerY,
+                    this.currentClickDouble
             );
             tracePressStart(this.press);
             trace(
@@ -574,78 +447,42 @@ public final class CreativeTabEditorController {
         return isEditing();
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
-// @target else
-    public boolean mouseDragged(
-            double mouseX,
-            double mouseY,
-            int button,
-            double deltaX,
-            double deltaY
-    ) {
-// @target end
-        if (this.folders.isOpen()) { return true; }
+    public boolean mouseDragged(Pointer event, double deltaX, double deltaY) {
+        if (this.folders.isOpen() || this.categories.isOpen()) { return true; }
         Press active = this.press;
         if (active != null
-// @target if minecraft_version=26.1.2,26.2
-//|                && event.button() == 0
-// @target else
-                && button == 0
-// @target end
+                && event.button() == 0
                 && !active.longTriggered
                 && !active.moved
                 && (active.kind == PressKind.NORMAL_TAB
                         || active.kind == PressKind.NORMAL_ITEM
                         || active.kind == PressKind.BLANK_TAB)
-                && Util.getMillis() - active.startedAt >= LONG_PRESS_MILLIS
+                && NativeClock.millis() - active.startedAt >= LONG_PRESS_MILLIS
                 && active.distanceSquared(this.pointerX, this.pointerY) < LONG_PRESS_SLOP_SQUARED) {
             trace(
                     "long-press-before-drag mode={} kind={} elapsedMs={} lastPointer=({}, {}) nextPointer=({}, {})",
                     this.mode,
                     active.kind,
-                    Util.getMillis() - active.startedAt,
+                    NativeClock.millis() - active.startedAt,
                     this.pointerX,
                     this.pointerY,
-// @target if minecraft_version=26.1.2,26.2
-//|                    event.x(),
-//|                    event.y()
-// @target else
-                    mouseX,
-                    mouseY
-// @target end
+                    event.x(),
+                    event.y()
             );
             triggerLongPress();
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        this.pointerX = event.x();
-//|        this.pointerY = event.y();
-// @target else
-        this.pointerX = mouseX;
-        this.pointerY = mouseY;
-// @target end
+        this.pointerX = event.x();
+        this.pointerY = event.y();
         if (this.mode == Mode.TAB_PROPERTIES) {
-// @target if minecraft_version=26.1.2,26.2
-//|            this.host.visualCreativeTabEditor$titleEditorMouseDragged(event, deltaX, deltaY);
-// @target else
-            this.host.visualCreativeTabEditor$titleEditorMouseDragged(mouseX, mouseY, button, deltaX, deltaY);
-// @target end
+            this.host.visualCreativeTabEditor$titleEditorMouseDragged(event, deltaX, deltaY);
             return true;
         }
         active = this.press;
         if (active != null && active.cancelled) { return true; }
-// @target if minecraft_version=26.1.2,26.2
-//|        if (active == null || event.button() != 0) {
-// @target else
-        if (active == null || button != 0) {
-// @target end
+        if (active == null || event.button() != 0) {
             return isModal();
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        double distanceSquared = active.distanceSquared(event.x(), event.y());
-// @target else
-        double distanceSquared = active.distanceSquared(mouseX, mouseY);
-// @target end
+        double distanceSquared = active.distanceSquared(event.x(), event.y());
         if (distanceSquared < DRAG_DISTANCE_SQUARED) {
             return true;
         }
@@ -660,13 +497,8 @@ public final class CreativeTabEditorController {
                     distanceSquared,
                     active.x,
                     active.y,
-// @target if minecraft_version=26.1.2,26.2
-//|                    event.x(),
-//|                    event.y()
-// @target else
-                    mouseX,
-                    mouseY
-// @target end
+                    event.x(),
+                    event.y()
             );
         }
         boolean normalPress = active.kind == PressKind.NORMAL_TAB
@@ -703,7 +535,7 @@ public final class CreativeTabEditorController {
         }
         if (active.kind == PressKind.EDIT_TAB
                 || (active.kind == PressKind.NORMAL_TAB && active.longTriggered)) {
-            ResourceLocation id = CreativeTabRuntime.id(active.tab).orElse(null);
+            ResourceId id = CreativeTabRuntime.id(active.tab).orElse(null);
             if (id == null) {
                 return true;
             }
@@ -712,13 +544,8 @@ public final class CreativeTabEditorController {
                 draft().setTabSelected(id, true);
             }
             this.mode = Mode.DRAG_TABS;
-// @target if minecraft_version=26.1.2,26.2
-//|            traceDragStart(active, event, Mode.DRAG_TABS);
-//|            int target = tabInsertionIndex(event.x(), event.y());
-// @target else
-            traceDragStart(active, mouseX, mouseY, Mode.DRAG_TABS);
-            int target = tabInsertionIndex(mouseX, mouseY);
-// @target end
+            traceDragStart(active, event, Mode.DRAG_TABS);
+            int target = tabInsertionIndex(event.x(), event.y());
             if (target >= 0 && target != this.lastDragTarget) {
                 checkpoint();
                 draft().moveSelectedTabs(target);
@@ -761,20 +588,11 @@ public final class CreativeTabEditorController {
                 active.originGroupId = CreativeTabClientConfig.groupSimilarItems() ? draft().itemGroupId(active.itemIndex) : null;
             }
             this.mode = Mode.DRAG_ITEMS;
-// @target if minecraft_version=26.1.2,26.2
-//|            traceDragStart(active, event, Mode.DRAG_ITEMS);
-//|            if (handleItemDragTabHover(event.x(), event.y())) {
-// @target else
-            traceDragStart(active, mouseX, mouseY, Mode.DRAG_ITEMS);
-            if (handleItemDragTabHover(mouseX, mouseY)) {
-// @target end
+            traceDragStart(active, event, Mode.DRAG_ITEMS);
+            if (handleItemDragTabHover(event.x(), event.y())) {
                 return true;
             }
-// @target if minecraft_version=26.1.2,26.2
-//|            int target = itemInsertionIndex(event.x(), event.y());
-// @target else
-            int target = itemInsertionIndex(mouseX, mouseY);
-// @target end
+            int target = itemInsertionIndex(event.x(), event.y());
             captureItemGroupDrop(active);
             String originGroup = active.groupId == null ? active.originGroupId : active.groupId;
             if (active.dropGroupId != null && !active.dropGroupId.equals(originGroup)) {
@@ -799,11 +617,7 @@ public final class CreativeTabEditorController {
                     return true;
                 }
                 preview();
-// @target if minecraft_version=1.20.1
-//|                int targetFocus = Mth.clamp(target, 0, Math.max(0, currentItemCount() - 1));
-// @target else
-                int targetFocus = Math.clamp(target, 0, Math.max(0, currentItemCount() - 1));
-// @target end
+                int targetFocus = Mth.clamp(target, 0, Math.max(0, currentItemCount() - 1));
                 int focusIndex = draft().selectedItemIndices().stream()
                         .min(Comparator.comparingInt(index -> Math.abs(index - targetFocus)))
                         .orElse(-1);
@@ -814,54 +628,29 @@ public final class CreativeTabEditorController {
         return true;
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    public boolean mouseReleased(MouseButtonEvent event) {
-// @target else
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-// @target end
-        if (this.folders.isOpen()) { return true; }
-// @target if minecraft_version=26.1.2,26.2
-//|        this.pointerX = event.x();
-//|        this.pointerY = event.y();
-// @target else
-        this.pointerX = mouseX;
-        this.pointerY = mouseY;
-// @target end
+    public boolean mouseReleased(Pointer event) {
+        if (this.folders.isOpen() || this.categories.isOpen()) { return true; }
+        this.pointerX = event.x();
+        this.pointerY = event.y();
         if (this.mode == Mode.TAB_PROPERTIES && this.press == null) {
-// @target if minecraft_version=26.1.2,26.2
-//|            this.host.visualCreativeTabEditor$titleEditorMouseReleased(event);
-// @target else
-            this.host.visualCreativeTabEditor$titleEditorMouseReleased(mouseX, mouseY, button);
-// @target end
+            this.host.visualCreativeTabEditor$titleEditorMouseReleased(event);
             return true;
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        if (event.button() != 0 || this.press == null) {
-// @target else
-        if (button != 0 || this.press == null) {
-// @target end
+        if (event.button() != 0 || this.press == null) {
             return isModal();
         }
         Press pendingRelease = this.press;
-        long releaseElapsed = Util.getMillis() - pendingRelease.startedAt;
+        long releaseElapsed = NativeClock.millis() - pendingRelease.startedAt;
         if (!pendingRelease.longTriggered
                 && !pendingRelease.moved
                 && releaseElapsed >= LONG_PRESS_MILLIS
-// @target if minecraft_version=26.1.2,26.2
-//|                && pendingRelease.distanceSquared(event.x(), event.y()) < LONG_PRESS_SLOP_SQUARED) {
-// @target else
-                && pendingRelease.distanceSquared(mouseX, mouseY) < LONG_PRESS_SLOP_SQUARED) {
-// @target end
+                && pendingRelease.distanceSquared(event.x(), event.y()) < LONG_PRESS_SLOP_SQUARED) {
             trace(
                     "long-press-release-fallback mode={} kind={} elapsedMs={} distanceSq={}",
                     this.mode,
                     pendingRelease.kind,
                     releaseElapsed,
-// @target if minecraft_version=26.1.2,26.2
-//|                    pendingRelease.distanceSquared(event.x(), event.y())
-// @target else
-                    pendingRelease.distanceSquared(mouseX, mouseY)
-// @target end
+                    pendingRelease.distanceSquared(event.x(), event.y())
             );
             triggerLongPress();
         }
@@ -871,51 +660,30 @@ public final class CreativeTabEditorController {
                 "mouse-up mode={} kind={} elapsedMs={} longTriggered={} moved={} press=({}, {}) release=({}, {})",
                 this.mode,
                 released.kind,
-                Util.getMillis() - released.startedAt,
+                NativeClock.millis() - released.startedAt,
                 released.longTriggered,
                 released.moved,
                 released.x,
                 released.y,
-// @target if minecraft_version=26.1.2,26.2
-//|                event.x(),
-//|                event.y()
-// @target else
-                mouseX,
-                mouseY
-// @target end
+                event.x(),
+                event.y()
         );
         if (this.mode == Mode.DRAG_ITEMS) {
-// @target if minecraft_version=26.1.2,26.2
-//|            handleItemDragTabHover(event.x(), event.y());
-// @target else
-            handleItemDragTabHover(mouseX, mouseY);
-// @target end
+            handleItemDragTabHover(event.x(), event.y());
         }
         this.press = null;
         if (this.mode == Mode.DRAG_TABS) {
-// @target if minecraft_version=26.1.2,26.2
-//|            boolean deleted = buttonAt(event.x(), event.y(), deleteRect());
-// @target else
-            boolean deleted = buttonAt(mouseX, mouseY, deleteRect());
-// @target end
+            boolean deleted = buttonAt(event.x(), event.y(), deleteRect());
             if (deleted) {
                 deleteTabs();
             } else if (this.lastDragTarget < 0) {
-// @target if minecraft_version=26.1.2,26.2
-//|                int target = tabInsertionIndex(event.x(), event.y());
-// @target else
-                int target = tabInsertionIndex(mouseX, mouseY);
-// @target end
+                int target = tabInsertionIndex(event.x(), event.y());
                 if (target >= 0) {
                     checkpoint();
                     draft().moveSelectedTabs(target);
                     preview();
                     this.host.visualCreativeTabEditor$refreshScreen();
-// @target if minecraft_version=26.1.2,26.2
-//|                    trace("tab-drag-release-insert target={} release=({}, {})", target, event.x(), event.y());
-// @target else
-                    trace("tab-drag-release-insert target={} release=({}, {})", target, mouseX, mouseY);
-// @target end
+                    trace("tab-drag-release-insert target={} release=({}, {})", target, event.x(), event.y());
                 }
             }
             this.mode = Mode.EDIT;
@@ -928,11 +696,7 @@ public final class CreativeTabEditorController {
             return true;
         }
         if (this.mode == Mode.DRAG_ITEMS) {
-// @target if minecraft_version=26.1.2,26.2
-//|            if (buttonAt(event.x(), event.y(), deleteRect())) {
-// @target else
-            if (buttonAt(mouseX, mouseY, deleteRect())) {
-// @target end
+            if (buttonAt(event.x(), event.y(), deleteRect())) {
                 deleteItems();
             } else {
                 finishItemGroupDrop(released);
@@ -965,17 +729,10 @@ public final class CreativeTabEditorController {
                 this.pendingSlotReplay = released;
             }
             trace(
-// @target if minecraft_version=26.1.2,26.2
-//|                    "slot-release-decision longTriggered={} moved={} doubleClick={} nativeReleaseAllows={} replayScheduled={} carried={}",
-// @target else
-                    "slot-release-decision longTriggered={} moved={} nativeReleaseAllows={} replayScheduled={} carried={}",
-// @target end
+                    "slot-release-decision longTriggered={} moved={} doubleClick={} nativeReleaseAllows={} replayScheduled={} carried={}",
                     released.longTriggered,
                     released.moved,
-// @target if minecraft_version=26.1.2,26.2
-//|                    released.doubleClick,
-// @target else
-// @target end
+                    released.doubleClick,
                     this.nativeReleaseAllowsAction,
                     this.pendingSlotReplay != null,
                     stackId(this.host.visualCreativeTabEditor$menu().getCarried())
@@ -987,11 +744,7 @@ public final class CreativeTabEditorController {
         }
         switch (released.kind) {
             case NORMAL_TAB -> {
-// @target if minecraft_version=26.1.2,26.2
-//|                CreativeModeTab hit = tabAt(event.x(), event.y());
-// @target else
-                CreativeModeTab hit = tabAt(mouseX, mouseY);
-// @target end
+                CreativeModeTab hit = tabAt(event.x(), event.y());
                 CreativeModeTab before = this.host.visualCreativeTabEditor$selectedTab();
                 trace(
                         "tab-click-release delegated-to-native requested={} localHit={} selectedBefore={} moved={} sameTarget={}",
@@ -1013,11 +766,7 @@ public final class CreativeTabEditorController {
         return true;
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    public void afterMouseReleased(MouseButtonEvent event) {
-// @target else
-    public void afterMouseReleased(double mouseX, double mouseY, int button) {
-// @target end
+    public void afterMouseReleased(Pointer event) {
         CreativeModeTab requestedTab = this.pendingNativeTabSelection;
         if (requestedTab != null) {
             CreativeModeTab before = this.nativeTabSelectionBefore;
@@ -1029,13 +778,8 @@ public final class CreativeTabEditorController {
                     tabId(after),
                     before != after,
                     after == requestedTab,
-// @target if minecraft_version=26.1.2,26.2
-//|                    event.x(),
-//|                    event.y()
-// @target else
-                    mouseX,
-                    mouseY
-// @target end
+                    event.x(),
+                    event.y()
             );
             this.pendingNativeTabSelection = null;
             this.nativeTabSelectionBefore = null;
@@ -1054,14 +798,7 @@ public final class CreativeTabEditorController {
         }
     }
 
-// @target if minecraft_version=1.20.1
-//|    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-// @target elif minecraft_version=26.1.2,26.2
-//|    public void extractRenderState(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-// @target else
-    /** Updates long-press, paging and drag-hover state before deciding whether an overlay pass is needed. */
-    public boolean prepareRender(int mouseX, int mouseY) {
-// @target end
+    public void render(EditorGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.pointerX = mouseX;
         this.pointerY = mouseY;
         triggerLongPress();
@@ -1070,25 +807,24 @@ public final class CreativeTabEditorController {
         if (this.mode == Mode.DRAG_ITEMS) {
             handleItemDragTabHover(mouseX, mouseY);
         }
-// @target if minecraft_version=1.20.1,26.1.2,26.2
-// @target else
-        return isEditing();
-    }
-
-    /** Draws the active editor in the isolated foreground pass prepared by the screen mixin. */
-    public void renderOverlay(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-// @target end
         if (!isEditing()) {
-// @target if minecraft_version=26.1.2,26.2
-//|            this.folders.render(graphics, mouseX, mouseY);
-// @target else
-// @target end
+            graphics.overlay(() -> renderIdleFolders(graphics, mouseX, mouseY));
             return;
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        graphics.nextStratum();
-// @target else
-// @target end
+        graphics.overlay(() -> renderOverlay(graphics, mouseX, mouseY, partialTick));
+    }
+
+    public void renderIdleFolders(EditorGraphics graphics, int mouseX, int mouseY) {
+        if (!isEditing()) {
+            if (!this.folders.isOpen() && !this.categories.isOpen()) {
+                this.categorySidebar.render(graphics, mouseX, mouseY);
+            }
+            this.folders.render(graphics, mouseX, mouseY);
+            this.categories.render(graphics, mouseX, mouseY);
+        }
+    }
+
+    private void renderOverlay(EditorGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (isModal()) {
             if (isPicker()) {
                 renderPickerBackdrop(graphics);
@@ -1120,7 +856,7 @@ public final class CreativeTabEditorController {
                     "visual_creative_tab_editor.editor.close_draft",
                     mouseX,
                     mouseY,
-                    0xFF555555
+                    Tone.NORMAL
             );
             return;
         }
@@ -1155,13 +891,19 @@ public final class CreativeTabEditorController {
         } else if (this.mode == Mode.GROUP_CONTROLS) {
             renderGroupControls(graphics, mouseX, mouseY);
         }
+        if (this.mode == Mode.EDIT) {
+            if (!this.categories.isOpen() && !this.folders.isOpen()) {
+                this.categorySidebar.render(graphics, mouseX, mouseY);
+            }
+            this.categories.render(graphics, mouseX, mouseY);
+        }
         if (isModal() && !isPicker()) {
             renderModalExitButtons(graphics, mouseX, mouseY);
         }
         if (this.mode == Mode.DRAG_TABS || this.mode == Mode.DRAG_ITEMS) {
             DragVisual visual = this.dragVisual;
             if (visual != null && !visual.icon.isEmpty()) {
-                graphics.renderItem(
+                graphics.item(
                         visual.icon,
                         Mth.floor(mouseX - visual.grabOffsetX),
                         Mth.floor(mouseY - visual.grabOffsetY)
@@ -1171,100 +913,63 @@ public final class CreativeTabEditorController {
     }
 
     public boolean suppressesTooltips() {
-        return isEditing() || this.folders.isOpen();
+        return isEditing() || this.folders.isOpen() || this.categories.isOpen();
     }
 
     public boolean suppressesItemTooltip(@Nullable Slot hoveredSlot) {
-        return this.folders.isOpen() || isEditing()
+        return this.folders.isOpen() || this.categories.isOpen() || isEditing()
                 && (!isPicker()
                 || hoveredSlot == null
                 || this.host.visualCreativeTabEditor$isCreativeSlot(hoveredSlot));
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    public boolean keyPressed(KeyEvent event) {
-//|        if (this.folders.isOpen()) { if (event.isEscape()) { this.folders.close(); } return true; }
-//|        if (this.mode == Mode.EDIT && (event.modifiers() & GLFW.GLFW_MOD_CONTROL) != 0) {
-//|            if (event.key() == GLFW.GLFW_KEY_Y || (event.key() == GLFW.GLFW_KEY_Z && (event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0)) {
-// @target else
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (this.folders.isOpen()) { if (keyCode == GLFW.GLFW_KEY_ESCAPE) { this.folders.close(); } return true; }
-        if (this.mode == Mode.EDIT && (modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
-            if (keyCode == GLFW.GLFW_KEY_Y || (keyCode == GLFW.GLFW_KEY_Z && (modifiers & GLFW.GLFW_MOD_SHIFT) != 0)) {
-// @target end
+    public boolean keyPressed(Key event) {
+        if (this.categories.isOpen()) { if (event.isEscape()) { this.categories.close(); } return true; }
+        if (this.folders.isOpen()) { if (event.isEscape()) { this.folders.close(); } return true; }
+        if (this.mode == Mode.EDIT && (event.modifiers() & GLFW.GLFW_MOD_CONTROL) != 0) {
+            if (event.key() == GLFW.GLFW_KEY_Y || (event.key() == GLFW.GLFW_KEY_Z && (event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0)) {
                 redo();
                 return true;
             }
-// @target if minecraft_version=26.1.2,26.2
-//|            if (event.key() == GLFW.GLFW_KEY_Z) { undo(); return true; }
-// @target else
-            if (keyCode == GLFW.GLFW_KEY_Z) { undo(); return true; }
-// @target end
+            if (event.key() == GLFW.GLFW_KEY_Z) { undo(); return true; }
         }
         if (this.mode == Mode.GROUP_CONTROLS) {
-// @target if minecraft_version=26.1.2,26.2
-//|            if (event.isEscape()) {
-// @target else
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-// @target end
+            if (event.isEscape()) {
                 this.mode = Mode.EDIT;
             }
             return true;
         }
         if (this.mode != Mode.TAB_PROPERTIES) {
-// @target if minecraft_version=26.1.2,26.2
-//|            if (isEditing() && event.isEscape()) {
-// @target else
-            if (isEditing() && keyCode == GLFW.GLFW_KEY_ESCAPE) {
-// @target end
+            if (isEditing() && event.isEscape()) {
                 if (this.mode != Mode.SAVING) {
                     cancelAndExit();
                 }
                 return true;
             }
             if (this.mode == Mode.EDIT || this.mode == Mode.DRAG_TABS || this.mode == Mode.DRAG_ITEMS) {
-// @target if minecraft_version=26.1.2,26.2
-//|                if (event.key() == GLFW.GLFW_KEY_PAGE_UP) {
-// @target else
-                if (keyCode == GLFW.GLFW_KEY_PAGE_UP) {
-// @target end
+                if (event.key() == GLFW.GLFW_KEY_PAGE_UP) {
                     switchPageFromKey(-1, "page-up");
                     return true;
                 }
-// @target if minecraft_version=26.1.2,26.2
-//|                if (event.key() == GLFW.GLFW_KEY_PAGE_DOWN) {
-// @target else
-                if (keyCode == GLFW.GLFW_KEY_PAGE_DOWN) {
-// @target end
+                if (event.key() == GLFW.GLFW_KEY_PAGE_DOWN) {
                     switchPageFromKey(1, "page-down");
                     return true;
                 }
             }
             return isEditing();
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
-// @target else
-        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
-// @target end
+        if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
             finishTitleEdit();
             return true;
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        if (event.isEscape()) {
-// @target else
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-// @target end
+        if (event.isEscape()) {
             this.host.visualCreativeTabEditor$hideTitleEditor();
             this.titleEditorInitialValue = null;
+            this.contextCategoryId = null;
             this.mode = Mode.EDIT;
             return true;
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        this.host.visualCreativeTabEditor$titleEditorKeyPressed(event);
-// @target else
-        this.host.visualCreativeTabEditor$titleEditorKeyPressed(keyCode, scanCode, modifiers);
-// @target end
+        this.host.visualCreativeTabEditor$titleEditorKeyPressed(event);
         return true;
     }
 
@@ -1296,34 +1001,27 @@ public final class CreativeTabEditorController {
         );
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    public boolean charTyped(CharacterEvent event) {
-// @target else
-    public boolean charTyped(char codePoint, int modifiers) {
-// @target end
+    public boolean charTyped(Character event) {
+        if (this.categories.isOpen()) { return true; }
         if (this.mode == Mode.TAB_PROPERTIES) {
-// @target if minecraft_version=26.1.2,26.2
-//|            this.host.visualCreativeTabEditor$titleEditorCharTyped(event);
-// @target else
-            this.host.visualCreativeTabEditor$titleEditorCharTyped(codePoint, modifiers);
-// @target end
+            this.host.visualCreativeTabEditor$titleEditorCharTyped(event);
             return true;
         }
         return isEditing();
-// @target if minecraft_version=26.1.2,26.2
-//|    }
-//|
-//|    public boolean preeditUpdated(@Nullable PreeditEvent event) {
-//|        if (this.mode != Mode.TAB_PROPERTIES) {
-//|            return isEditing();
-//|        }
-//|        this.host.visualCreativeTabEditor$titleEditorPreeditUpdated(event);
-//|        return true;
-// @target else
-// @target end
+    }
+
+    public boolean preeditUpdated(@Nullable Preedit event) {
+        if (this.categories.isOpen()) { return true; }
+        if (this.mode != Mode.TAB_PROPERTIES) {
+            return isEditing();
+        }
+        this.host.visualCreativeTabEditor$titleEditorPreeditUpdated(event);
+        return true;
     }
 
     public void removed() {
+        this.categories.close();
+        this.contextCategoryId = null;
         this.contextGroupId = null;
         this.contextMemberGroupId = null;
         this.contextGroupIcon = ItemStack.EMPTY;
@@ -1356,13 +1054,12 @@ public final class CreativeTabEditorController {
         CreativeTabRuntime.clearPreview();
     }
 
-// @target if minecraft_version=1.20.1
-//|    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-//|        if (this.folders.scroll(delta)) { return true; }
-// @target else
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+        if ((this.mode == Mode.NORMAL || this.mode == Mode.EDIT)
+                && !this.categories.isOpen() && !this.folders.isOpen()
+                && this.categorySidebar.scroll(mouseX, mouseY, vertical)) { return true; }
+        if (this.categories.scroll(vertical)) { return true; }
         if (this.folders.scroll(vertical)) { return true; }
-// @target end
         return isModal();
     }
 
@@ -1375,7 +1072,7 @@ public final class CreativeTabEditorController {
                 || this.mode == Mode.DRAG_ITEMS) {
             return;
         }
-        long elapsed = Util.getMillis() - active.startedAt;
+        long elapsed = NativeClock.millis() - active.startedAt;
         if (elapsed < LONG_PRESS_MILLIS) {
             return;
         }
@@ -1602,11 +1299,7 @@ public final class CreativeTabEditorController {
                 currentSearchItemCount(),
                 this.pickerReturnScrollRow
         );
-// @target if minecraft_version=1.20.1
-//|        ResourceLocation inventoryId = new ResourceLocation("inventory");
-// @target else
-        ResourceLocation inventoryId = ResourceLocation.withDefaultNamespace("inventory");
-// @target end
+        ResourceId inventoryId = ResourceId.withDefaultNamespace("inventory");
         CreativeModeTab inventory = CreativeTabRuntime
                 .effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream())
                 .filter(tab -> CreativeTabRuntime.id(tab).filter(inventoryId::equals).isPresent())
@@ -1670,7 +1363,7 @@ public final class CreativeTabEditorController {
     private void acceptPickedItem(ItemStack stack) {
         Mode pickerMode = this.mode;
         ItemStack picked = stack.copyWithCount(1);
-        ResourceLocation createdTabId = null;
+        ResourceId createdTabId = null;
         int tabsBefore = draft().tabCount();
         int itemsBefore = currentItemCount();
         int searchItemsBefore = currentSearchItemCount();
@@ -1687,7 +1380,10 @@ public final class CreativeTabEditorController {
             case PICK_REPLACEMENT -> resultIndex = draft().replaceItem(this.contextItemIndex, picked);
             case PICK_NEW_ITEM -> resultIndex = draft().addItem(picked);
             case PICK_TAB_ICON -> {
-                if (this.contextGroupId == null) {
+                if (this.contextCategoryId != null) {
+                    draft().setCategoryIcon(this.contextCategoryId, picked);
+                    this.contextCategoryId = null;
+                } else if (this.contextGroupId == null) {
                     draft().setTabIcon(requireContextTab(), picked);
                 } else {
                     draft().setItemGroupIcon(this.contextGroupId, picked);
@@ -1755,7 +1451,7 @@ public final class CreativeTabEditorController {
         );
     }
 
-    private void selectCreatedTab(ResourceLocation createdTabId) {
+    private void selectCreatedTab(ResourceId createdTabId) {
         this.host.visualCreativeTabEditor$refreshScreen();
         CreativeModeTab createdTab = CreativeTabRuntime.effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream())
                 .filter(tab -> CreativeTabRuntime.id(tab).filter(createdTabId::equals).isPresent())
@@ -1785,6 +1481,30 @@ public final class CreativeTabEditorController {
     }
 
     private boolean clickControl(double x, double y) {
+        if (canEditCategories()) {
+            String category = this.categories.focusedCategory();
+            if (buttonAt(x, y, categoryEditRect())) {
+                if (category != null) { editCategory(CreativeTabCategoryBrowser.Action.EDIT, category); }
+                return true;
+            }
+            if (buttonAt(x, y, categoryDeleteRect())) {
+                if (category != null) { editCategory(CreativeTabCategoryBrowser.Action.DELETE, category); }
+                return true;
+            }
+        }
+        if (buttonAt(x, y, groupDisplayRect())) {
+            try {
+                CreativeTabClientConfig.setGroupSimilarItems(!CreativeTabClientConfig.groupSimilarItems());
+                this.groupConfigFailed = false;
+                this.focusedGroupId = null;
+                this.press = null;
+                refreshCategoryView();
+            } catch (java.io.IOException exception) {
+                this.groupConfigFailed = true;
+                VisualCreativeTabEditorConstants.LOGGER.error("Could not save creative item grouping preference", exception);
+            }
+            return true;
+        }
         if (groupControlsAvailable() && buttonAt(x, y, groupControlsRect())) {
             String group = focusedItemGroup();
             this.groupControlTitle = group == null
@@ -1938,9 +1658,11 @@ public final class CreativeTabEditorController {
         this.host.visualCreativeTabEditor$hideTitleEditor();
         this.titleEditorInitialValue = null;
         this.mode = Mode.EDIT;
+        this.contextCategoryId = null;
     }
 
     private void openTabProperties(CreativeTabDefinition definition) {
+        this.contextCategoryId = null;
         this.contextGroupId = null;
         this.mode = Mode.TAB_PROPERTIES;
         this.titleEditorInitialValue = definition.title().getString();
@@ -1948,6 +1670,7 @@ public final class CreativeTabEditorController {
     }
 
     private void openGroupProperties(String id) {
+        this.contextCategoryId = null;
         this.focusedGroupId = id;
         this.focusedGroupTabId = draft().currentTabId().orElse(null);
         CreativeItemGroup group = draft().itemGroup(id);
@@ -1961,6 +1684,14 @@ public final class CreativeTabEditorController {
     }
 
     private boolean commitTabTitleIfChanged(String reason) {
+        if (this.contextCategoryId != null) {
+            String next = this.host.visualCreativeTabEditor$titleEditorValue();
+            if (Objects.equals(this.titleEditorInitialValue, next)) { return false; }
+            checkpoint();
+            draft().setCategoryTitle(this.contextCategoryId, Component.literal(next));
+            this.titleEditorInitialValue = next;
+            return true;
+        }
         if (this.contextGroupId != null) {
             String next = this.host.visualCreativeTabEditor$titleEditorValue();
             if (Objects.equals(this.titleEditorInitialValue, next)) { return false; }
@@ -1969,7 +1700,7 @@ public final class CreativeTabEditorController {
             this.titleEditorInitialValue = next;
             return true;
         }
-        ResourceLocation tabId = requireContextTab();
+        ResourceId tabId = requireContextTab();
         CreativeTabDefinition before = draft().definition(tabId).orElseThrow();
         String initial = this.titleEditorInitialValue == null
                 ? before.title().getString()
@@ -2037,7 +1768,7 @@ public final class CreativeTabEditorController {
     private void deleteTabs() {
         int preferredRow = this.host.visualCreativeTabEditor$menu()
                 .getRowIndexForScroll(this.host.visualCreativeTabEditor$scrollOffset());
-        Set<ResourceLocation> selected = new LinkedHashSet<>(draft().selectedTabIds());
+        Set<ResourceId> selected = new LinkedHashSet<>(draft().selectedTabIds());
         if (selected.isEmpty()) {
             return;
         }
@@ -2052,8 +1783,8 @@ public final class CreativeTabEditorController {
                     .findFirst()
                     .ifPresent(selected::remove);
         }
-        ResourceLocation currentId = draft().currentTabId().orElse(null);
-        ResourceLocation fallbackId = currentId != null && selected.contains(currentId)
+        ResourceId currentId = draft().currentTabId().orElse(null);
+        ResourceId fallbackId = currentId != null && selected.contains(currentId)
                 ? draft().tabs().stream()
                         .filter(definition -> definition.type() == CreativeTabType.CATEGORY && !definition.hidden())
                         .map(CreativeTabDefinition::id)
@@ -2178,7 +1909,7 @@ public final class CreativeTabEditorController {
         refreshAfterHistoryChange();
     }
 
-    private List<ResourceLocation> deletedTabIds() {
+    private List<ResourceId> deletedTabIds() {
         if (this.draft == null) {
             return List.of();
         }
@@ -2189,7 +1920,7 @@ public final class CreativeTabEditorController {
     }
 
     private void restoreDeletedTabs() {
-        List<ResourceLocation> deleted = deletedTabIds();
+        List<ResourceId> deleted = deletedTabIds();
         if (deleted.isEmpty()) {
             return;
         }
@@ -2201,7 +1932,7 @@ public final class CreativeTabEditorController {
     private void refreshAfterHistoryChange() {
         preview();
         CreativeTabRuntime.rebuildSearchContents();
-        ResourceLocation selected = draft().currentTabId().orElse(null);
+        ResourceId selected = draft().currentTabId().orElse(null);
         CreativeModeTab tab = CreativeTabRuntime.effectiveTabs(BuiltInRegistries.CREATIVE_MODE_TAB.stream())
                 .filter(candidate -> CreativeTabRuntime.id(candidate).filter(id -> id.equals(selected)).isPresent())
                 .findFirst().orElse(null);
@@ -2226,11 +1957,11 @@ public final class CreativeTabEditorController {
             return;
         }
         CreativeModeTab selected = this.host.visualCreativeTabEditor$selectedTab();
-        ResourceLocation selectedId = CreativeTabRuntime.id(selected).orElse(null);
+        ResourceId selectedId = CreativeTabRuntime.id(selected).orElse(null);
         if (selectedId == null || this.draft.definition(selectedId).isEmpty()) {
             return;
         }
-        ResourceLocation before = this.draft.currentTabId().orElse(null);
+        ResourceId before = this.draft.currentTabId().orElse(null);
         if (selectedId.equals(before)) {
             return;
         }
@@ -2344,7 +2075,7 @@ public final class CreativeTabEditorController {
         this.contextGroupIcon = ItemStack.EMPTY;
         this.focusedGroupId = null;
         this.focusedGroupTabId = null;
-        ResourceLocation restoreId = restoreEntryTab ? this.editorEntryTabId : null;
+        ResourceId restoreId = restoreEntryTab ? this.editorEntryTabId : null;
         restorePickerTab();
         this.press = null;
         this.dragVisual = null;
@@ -2374,7 +2105,8 @@ public final class CreativeTabEditorController {
                     .orElse(null);
             boolean revealed = restore != null
                     && CreativeTabClientPlatform.revealTab(this.host.visualCreativeTabEditor$screen(), restore);
-            if (revealed) {
+            // Native init callbacks already restore the active filter for an unchanged tab.
+            if (revealed && this.host.visualCreativeTabEditor$selectedTab() != restore) {
                 this.host.visualCreativeTabEditor$selectTab(restore);
             }
             trace(
@@ -2422,20 +2154,33 @@ public final class CreativeTabEditorController {
         }
     }
 
-    private void renderControls(GuiGraphics graphics, int mouseX, int mouseY) {
-        renderButton(graphics, undoRect(), "visual_creative_tab_editor.editor.undo", mouseX, mouseY, 0xFF555555);
-        renderButton(graphics, redoRect(), "visual_creative_tab_editor.editor.redo", mouseX, mouseY, 0xFF555555);
-        renderButton(graphics, restoreRect(), "visual_creative_tab_editor.editor.restore", mouseX, mouseY, 0xFF555555);
-        renderButton(graphics, defaultOrderRect(), "visual_creative_tab_editor.editor.default_order", mouseX, mouseY, 0xFF555555);
-        renderButton(graphics, globalSaveRect(), "visual_creative_tab_editor.editor.global_save", mouseX, mouseY, 0xFF315B7A);
-        renderButton(graphics, saveRect(), "visual_creative_tab_editor.editor.save", mouseX, mouseY, 0xFF2D6A3F);
-        renderButton(graphics, cancelRect(), "visual_creative_tab_editor.editor.cancel", mouseX, mouseY, 0xFF555555);
-        renderButton(graphics, deleteRect(), "visual_creative_tab_editor.editor.delete", mouseX, mouseY, 0xFF8B2F2F);
+    private void renderControls(EditorGraphics graphics, int mouseX, int mouseY) {
+        renderButton(graphics, groupDisplayRect(), this.groupConfigFailed
+                        ? "visual_creative_tab_editor.group.config_failed"
+                        : CreativeTabClientConfig.groupSimilarItems()
+                                ? "visual_creative_tab_editor.group.disable_all"
+                                : "visual_creative_tab_editor.group.enable_all",
+                mouseX, mouseY, this.groupConfigFailed ? Tone.DANGER : Tone.NORMAL);
+        renderButton(graphics, undoRect(), "visual_creative_tab_editor.editor.undo", mouseX, mouseY, Tone.NORMAL);
+        renderButton(graphics, redoRect(), "visual_creative_tab_editor.editor.redo", mouseX, mouseY, Tone.NORMAL);
+        renderButton(graphics, restoreRect(), "visual_creative_tab_editor.editor.restore", mouseX, mouseY, Tone.NORMAL);
+        renderButton(graphics, defaultOrderRect(), "visual_creative_tab_editor.editor.default_order", mouseX, mouseY, Tone.NORMAL);
+        renderButton(graphics, globalSaveRect(), "visual_creative_tab_editor.editor.global_save", mouseX, mouseY, Tone.NORMAL);
+        renderButton(graphics, saveRect(), "visual_creative_tab_editor.editor.save", mouseX, mouseY, Tone.PRIMARY);
+        renderButton(graphics, cancelRect(), "visual_creative_tab_editor.editor.cancel", mouseX, mouseY, Tone.NORMAL);
+        renderButton(graphics, deleteRect(), "visual_creative_tab_editor.editor.delete", mouseX, mouseY, Tone.DANGER);
         if (currentType() == CreativeTabType.CATEGORY || currentType() == CreativeTabType.SEARCH) {
-            renderButton(graphics, sortRect(), "visual_creative_tab_editor.editor.sort", mouseX, mouseY, 0xFF315B7A);
+            renderButton(graphics, sortRect(), "visual_creative_tab_editor.editor.sort", mouseX, mouseY, Tone.NORMAL);
         }
         if (groupControlsAvailable()) {
-            renderButton(graphics, groupControlsRect(), "visual_creative_tab_editor.group.controls", mouseX, mouseY, 0xFF315B7A);
+            renderButton(graphics, groupControlsRect(), "visual_creative_tab_editor.group.controls", mouseX, mouseY, Tone.NORMAL);
+        }
+        if (canEditCategories()) {
+            boolean selected = this.categories.focusedCategory() != null;
+            renderButton(graphics, categoryEditRect(), "visual_creative_tab_editor.category.edit_selected",
+                    mouseX, mouseY, Tone.NORMAL, selected);
+            renderButton(graphics, categoryDeleteRect(), "visual_creative_tab_editor.category.delete_selected",
+                    mouseX, mouseY, Tone.DANGER, selected);
         }
     }
 
@@ -2459,6 +2204,61 @@ public final class CreativeTabEditorController {
             case DETACH -> draft().hasSelectedGroupedItems();
             case BACK -> true;
         };
+    }
+
+    private void refreshCategoryView() {
+        itemGroups().invalidate();
+        this.host.visualCreativeTabEditor$setScrollOffset(0);
+        this.host.visualCreativeTabEditor$menu().scrollTo(0);
+    }
+
+    private void editCategory(CreativeTabCategoryBrowser.Action action, @Nullable String id) {
+        try {
+            applyCategoryEdit(action, id);
+        } catch (IllegalArgumentException exception) {
+            VisualCreativeTabEditorConstants.LOGGER.warn("Could not apply creative category edit {}", action, exception);
+            if (this.host.visualCreativeTabEditor$minecraft().player != null) {
+                this.host.visualCreativeTabEditor$minecraft().player.sendSystemMessage(
+                        Component.translatable("visual_creative_tab_editor.category.edit_failed"));
+            }
+        }
+    }
+
+    private void applyCategoryEdit(CreativeTabCategoryBrowser.Action action, @Nullable String id) {
+        if (action == CreativeTabCategoryBrowser.Action.EDIT) {
+            openCategoryProperties(Objects.requireNonNull(id));
+            return;
+        }
+        checkpoint();
+        switch (action) {
+            case NEW -> {
+                String created = draft().createCategory();
+                this.categories.focus(created);
+                preview();
+                this.categorySidebar.reveal(created);
+                openCategoryProperties(created);
+                return;
+            }
+            case DELETE -> draft().deleteCategory(Objects.requireNonNull(id));
+            case ADD -> draft().changeSelectedCategoryMembers(Objects.requireNonNull(id), true);
+            case REMOVE -> draft().changeSelectedCategoryMembers(Objects.requireNonNull(id), false);
+            case UP -> draft().moveCategory(Objects.requireNonNull(id), -1);
+            case DOWN -> draft().moveCategory(Objects.requireNonNull(id), 1);
+            default -> { return; }
+        }
+        preview();
+        refreshCategoryView();
+    }
+
+    private void openCategoryProperties(String id) {
+        this.categories.close();
+        CreativeTabCategory category = draft().category(id);
+        this.contextCategoryId = id;
+        this.contextGroupId = null;
+        this.contextTabId = draft().currentTabId().orElseThrow();
+        this.mode = Mode.TAB_PROPERTIES;
+        this.titleEditorInitialValue = category.title().getString();
+        this.host.visualCreativeTabEditor$showTitleEditor(this.titleEditorInitialValue);
     }
 
     private boolean clickGroupControls(double x, double y) {
@@ -2505,26 +2305,30 @@ public final class CreativeTabEditorController {
         return true;
     }
 
-    private void renderGroupControls(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderGroupControls(EditorGraphics graphics, int mouseX, int mouseY) {
         Rect panel = groupPanelRect();
-        graphics.fill(panel.x, panel.y, panel.right(), panel.bottom(), 0xEE202020);
-        graphics.renderOutline(panel.x, panel.y, panel.width, panel.height, 0xFFFFFFFF);
+        EditorTheme.panel(graphics, panel.x, panel.y, panel.width, panel.height, 29);
         var font = this.host.visualCreativeTabEditor$font();
-        graphics.drawString(font, Component.translatable("visual_creative_tab_editor.group.controls"),
-                panel.x + 8, panel.y + 6, 0xFFFFFFFF, false);
+        graphics.text(font, Component.translatable("visual_creative_tab_editor.group.controls"),
+                panel.x + 8, panel.y + 6, EditorTheme.TEXT_DARK, false);
         String title = font.plainSubstrByWidth(this.groupControlTitle.getString(), panel.width - 16);
-        graphics.drawString(font, title, panel.x + 8, panel.y + 18, 0xFFD0D0D0, false);
+        graphics.text(font, title, panel.x + 8, panel.y + 18, EditorTheme.TEXT_DISABLED, false);
         for (GroupAction action : GroupAction.values()) {
             renderButton(graphics, groupActionRect(action), action.key(), mouseX, mouseY,
-                    action == GroupAction.DELETE ? 0xFF8B2F2F : 0xFF555555, groupActionEnabled(action));
+                    action == GroupAction.DELETE ? Tone.DANGER : Tone.NORMAL, groupActionEnabled(action));
         }
     }
 
     private Rect groupControlsRect() {
-        int x = this.host.visualCreativeTabEditor$left() + this.host.visualCreativeTabEditor$imageWidth() + 4;
-        int width = Math.min(70, this.host.visualCreativeTabEditor$screenWidth() - x - 2);
-        return new Rect(x, this.host.visualCreativeTabEditor$top() + 4, width, BUTTON_HEIGHT);
+        return toolbarRect(toolbar().secondary(0));
     }
+
+    private Rect groupDisplayRect() {
+        return toolbarRect(toolbar().secondary(2));
+    }
+
+    private Rect categoryEditRect() { return toolbarRect(toolbar().secondary(3)); }
+    private Rect categoryDeleteRect() { return toolbarRect(toolbar().secondary(4)); }
 
     private Rect groupPanelRect() {
         int width = Math.min(186, this.host.visualCreativeTabEditor$screenWidth() - 16);
@@ -2537,9 +2341,9 @@ public final class CreativeTabEditorController {
         return new Rect(panel.x + 8, panel.y + 32 + action.ordinal() * 18, panel.width - 16, 16);
     }
 
-    private void renderTabChecks(GuiGraphics graphics) {
+    private void renderTabChecks(EditorGraphics graphics) {
         for (CreativeModeTab tab : CreativeTabClientPlatform.visibleTabs(this.host.visualCreativeTabEditor$screen())) {
-            ResourceLocation id = CreativeTabRuntime.id(tab).orElse(null);
+            ResourceId id = CreativeTabRuntime.id(tab).orElse(null);
             if (id == null) {
                 continue;
             }
@@ -2549,7 +2353,7 @@ public final class CreativeTabEditorController {
         }
     }
 
-    private void renderItemChecks(GuiGraphics graphics) {
+    private void renderItemChecks(EditorGraphics graphics) {
         if (!canReorderCurrentItems() || !screenMatchesDraftCurrentTab()) {
             return;
         }
@@ -2572,28 +2376,20 @@ public final class CreativeTabEditorController {
         }
     }
 
-    private void renderCheck(GuiGraphics graphics, int x, int y, boolean selected) {
-        graphics.fill(x, y, x + 8, y + 8, selected ? 0xFF2DAA4F : 0xCC222222);
-        graphics.renderOutline(x, y, 8, 8, 0xFFFFFFFF);
-        if (selected) {
-// @target if minecraft_version=1.20.1
-//|            graphics.drawString(this.host.visualCreativeTabEditor$font(), Component.literal("\u2713"), x + 1, y - 1, 0xFFFFFFFF, false);
-// @target else
-            graphics.drawString(this.host.visualCreativeTabEditor$font(), Component.literal("✓"), x + 1, y - 1, 0xFFFFFFFF, false);
-// @target end
-        }
+    private void renderCheck(EditorGraphics graphics, int x, int y, boolean selected) {
+        EditorTheme.checkbox(graphics, x, y, 8, selected, false);
     }
 
-    private void renderContextMenu(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderContextMenu(EditorGraphics graphics, int mouseX, int mouseY) {
         List<ContextAction> actions = contextActions();
         for (int index = 0; index < actions.size(); index++) {
             ContextAction action = actions.get(index);
             renderButton(graphics, contextActionRect(index), action.label(this.contextGroupId != null),
-                    mouseX, mouseY, action == ContextAction.DELETE ? 0xFF8B2F2F : 0xFF315B7A);
+                    mouseX, mouseY, action == ContextAction.DELETE ? Tone.DANGER : Tone.NORMAL);
         }
     }
 
-    private void renderContextTarget(GuiGraphics graphics) {
+    private void renderContextTarget(EditorGraphics graphics) {
         ItemStack stack = ItemStack.EMPTY;
         if (this.mode == Mode.CONTEXT_TAB && this.contextTabId != null) {
             stack = draft().definition(this.contextTabId).map(CreativeTabDefinition::icon).orElse(ItemStack.EMPTY);
@@ -2602,26 +2398,21 @@ public final class CreativeTabEditorController {
         }
         if (!stack.isEmpty()) {
             graphics.fill(this.contextTargetX - 2, this.contextTargetY - 2, this.contextTargetX + 18, this.contextTargetY + 18, 0xCC222222);
-            graphics.renderItem(stack, this.contextTargetX, this.contextTargetY);
-            graphics.renderOutline(this.contextTargetX - 2, this.contextTargetY - 2, 20, 20, 0xFFFFFFFF);
+            graphics.item(stack, this.contextTargetX, this.contextTargetY);
+            graphics.outline(this.contextTargetX - 2, this.contextTargetY - 2, 20, 20, 0xFFFFFFFF);
         }
     }
 
-    private void renderTabProperties(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    private void renderTabProperties(EditorGraphics graphics, int mouseX, int mouseY, float partialTick) {
         Rect panel = propertiesPanel();
-        graphics.fill(panel.x, panel.y, panel.right(), panel.bottom(), 0xEE202020);
-        graphics.renderOutline(panel.x, panel.y, panel.width, panel.height, 0xFFFFFFFF);
-        graphics.drawString(this.host.visualCreativeTabEditor$font(), Component.translatable("visual_creative_tab_editor.editor.title"), panel.x + 8, panel.y + 7, 0xFFFFFFFF, false);
-// @target if minecraft_version=26.1.2,26.2
-//|        this.host.visualCreativeTabEditor$extractTitleEditor(graphics, mouseX, mouseY, partialTick);
-// @target else
+        EditorTheme.panel(graphics, panel.x, panel.y, panel.width, panel.height, 19);
+        graphics.text(this.host.visualCreativeTabEditor$font(), Component.translatable("visual_creative_tab_editor.editor.title"), panel.x + 8, panel.y + 7, EditorTheme.TEXT_DARK, false);
         this.host.visualCreativeTabEditor$renderTitleEditor(graphics, mouseX, mouseY, partialTick);
-// @target end
-        renderButton(graphics, new Rect(panel.x + 8, panel.y + 52, 76, BUTTON_HEIGHT), "visual_creative_tab_editor.editor.change_icon", mouseX, mouseY, 0xFF315B7A);
-        renderButton(graphics, new Rect(panel.right() - 52, panel.y + 52, 44, BUTTON_HEIGHT), "visual_creative_tab_editor.editor.done", mouseX, mouseY, 0xFF2D6A3F);
+        renderButton(graphics, new Rect(panel.x + 8, panel.y + 52, 76, BUTTON_HEIGHT), "visual_creative_tab_editor.editor.change_icon", mouseX, mouseY, Tone.NORMAL);
+        renderButton(graphics, new Rect(panel.right() - 52, panel.y + 52, 44, BUTTON_HEIGHT), "visual_creative_tab_editor.editor.done", mouseX, mouseY, Tone.PRIMARY);
     }
 
-    private void renderSortMenu(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderSortMenu(EditorGraphics graphics, int mouseX, int mouseY) {
         List<CreativeTabSortMode> modes = sortModes();
         Rect menu = sortMenuRect(modes.size());
         for (int index = 0; index < modes.size(); index++) {
@@ -2631,13 +2422,13 @@ public final class CreativeTabEditorController {
                     sortKey(modes.get(index)),
                     mouseX,
                     mouseY,
-                    0xFF315B7A
+                    Tone.NORMAL
             );
         }
     }
 
-    private void renderInventoryPicker(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(
+    private void renderInventoryPicker(EditorGraphics graphics, int mouseX, int mouseY) {
+        graphics.text(
                 this.host.visualCreativeTabEditor$font(),
                 Component.translatable("visual_creative_tab_editor.editor.select_item"),
                 Math.max(4, this.host.visualCreativeTabEditor$left() + 8),
@@ -2648,7 +2439,7 @@ public final class CreativeTabEditorController {
         renderModalExitButtons(graphics, mouseX, mouseY);
     }
 
-    private void renderPickerBackdrop(GuiGraphics graphics) {
+    private void renderPickerBackdrop(EditorGraphics graphics) {
         int screenWidth = Math.max(0, this.host.visualCreativeTabEditor$screenWidth());
         int screenHeight = Math.max(0, this.host.visualCreativeTabEditor$screenHeight());
         int left = Mth.clamp(this.host.visualCreativeTabEditor$left(), 0, screenWidth);
@@ -2681,80 +2472,51 @@ public final class CreativeTabEditorController {
         }
     }
 
-    private void renderModalExitButtons(GuiGraphics graphics, int mouseX, int mouseY) {
-        renderButton(graphics, saveRect(), "visual_creative_tab_editor.editor.save", mouseX, mouseY, 0xFF2D6A3F);
-        renderButton(graphics, cancelRect(), "visual_creative_tab_editor.editor.cancel", mouseX, mouseY, 0xFF555555);
+    private void renderModalExitButtons(EditorGraphics graphics, int mouseX, int mouseY) {
+        renderButton(graphics, saveRect(), "visual_creative_tab_editor.editor.save", mouseX, mouseY, Tone.PRIMARY);
+        renderButton(graphics, cancelRect(), "visual_creative_tab_editor.editor.cancel", mouseX, mouseY, Tone.NORMAL);
     }
 
-    private static void renderCenteredText(GuiGraphics graphics, net.minecraft.client.gui.Font font,
+    private static void renderCenteredText(EditorGraphics graphics, net.minecraft.client.gui.Font font,
                                            Component text, int x, int y, int color) {
-        graphics.drawString(font, text, x - font.width(text) / 2, y, color, false);
+        graphics.text(font, text, x - font.width(text) / 2, y, color, false);
     }
 
-    private void renderButton(GuiGraphics graphics, Rect rect, String key, int mouseX, int mouseY, int color) {
+    private void renderButton(EditorGraphics graphics, Rect rect, String key, int mouseX, int mouseY, Tone tone) {
         boolean enabled = !key.endsWith(".undo") || canUndo();
         enabled &= !key.endsWith(".redo") || canRedo();
         enabled &= !key.endsWith(".restore") || !deletedTabIds().isEmpty();
-        renderButton(graphics, rect, key, mouseX, mouseY, color, enabled);
+        renderButton(graphics, rect, key, mouseX, mouseY, tone, enabled);
     }
 
-    private void renderButton(GuiGraphics graphics, Rect rect, String key, int mouseX, int mouseY,
-                              int color, boolean enabled) {
+    private void renderButton(EditorGraphics graphics, Rect rect, String key, int mouseX, int mouseY,
+                              Tone tone, boolean enabled) {
         boolean hovered = enabled && rect.contains(mouseX, mouseY);
-        boolean green = color == 0xFF2D6A3F;
-        boolean red = color == 0xFF8B2F2F;
-        int face = !enabled ? 0xFF777777 : green ? (hovered ? 0xFF4C9E35 : 0xFF3C8527)
-                : red ? (hovered ? 0xFFC94D3F : 0xFFAA382C) : (hovered ? 0xFFE0E0E0 : 0xFFC6C6C6);
-        graphics.fill(rect.x, rect.y, rect.right(), rect.bottom(), 0xFF1E1E1E);
-        graphics.fill(rect.x + 1, rect.y + 1, rect.right() - 1, rect.bottom() - 1, 0xFF454545);
-        graphics.fill(rect.x + 2, rect.y + 2, rect.right() - 2, rect.bottom() - 3, face);
-        graphics.fill(rect.x + 2, rect.y + 1, rect.right() - 2, rect.y + 2, enabled ? 0xFFEEEEEE : 0xFF999999);
-        graphics.fill(rect.x + 1, rect.y + 2, rect.x + 2, rect.bottom() - 3, enabled ? 0xFFEEEEEE : 0xFF999999);
-        if (hovered) {
-            graphics.renderOutline(rect.x, rect.y, rect.width, rect.height, 0xFFFFFFFF);
-        }
+        int textColor = EditorTheme.button(graphics, rect.x, rect.y, rect.width, rect.height, tone, enabled, hovered);
         var font = this.host.visualCreativeTabEditor$font();
         String label = font.plainSubstrByWidth(Component.translatable(key).getString(), Math.max(0, rect.width - 6));
         renderCenteredText(graphics, font, Component.literal(label), rect.x + rect.width / 2, rect.y + 4,
-                !enabled ? 0xFFB0B0B0 : green || red ? 0xFFFFFFFF : 0xFF202020);
+                textColor);
+        Component fullLabel = Component.translatable(key);
+        if (font.width(fullLabel) > rect.width - 6 && rect.contains(mouseX, mouseY)) {
+            graphics.tooltip(font, fullLabel, mouseX, mouseY);
+        }
     }
 
-    private void renderItemPlus(GuiGraphics graphics, Rect rect) {
+    private void renderItemPlus(EditorGraphics graphics, Rect rect) {
         graphics.fill(rect.x, rect.y, rect.right(), rect.bottom(), 0x66333333);
-        graphics.renderOutline(rect.x, rect.y, rect.width, rect.height, 0x88FFFFFF);
+        graphics.outline(rect.x, rect.y, rect.width, rect.height, 0x88FFFFFF);
         renderCenteredText(graphics, this.host.visualCreativeTabEditor$font(), Component.literal("+"), rect.x + rect.width / 2, rect.y + 4, 0xAAFFFFFF);
     }
 
     private void renderTabPlus(
-            GuiGraphics graphics,
+            EditorGraphics graphics,
             TabPlusTarget target,
             int mouseX,
             int mouseY
     ) {
         Rect sprite = target.spriteRect();
-// @target if minecraft_version=1.20.1
-//|        int textureY = target.row() == CreativeModeTab.Row.TOP ? 0 : 64;
-//|        RenderSystem.enableBlend();
-//|        graphics.blit(
-//|                CREATIVE_TABS_LOCATION,
-//|                sprite.x,
-//|                sprite.y,
-//|                target.column() * 26,
-//|                textureY,
-//|                sprite.width,
-//|                sprite.height
-// @target else
-        String rowName = target.row() == CreativeModeTab.Row.TOP ? "top" : "bottom";
-        ResourceLocation spriteId = ResourceLocation.withDefaultNamespace(
-                "container/creative_inventory/tab_" + rowName + "_unselected_" + (target.column() + 1)
-// @target end
-        );
-// @target if minecraft_version=1.20.1
-// @target elif minecraft_version=26.1.2,26.2
-//|        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, spriteId, sprite.x, sprite.y, sprite.width, sprite.height);
-// @target else
-        graphics.blitSprite(spriteId, sprite.x, sprite.y, sprite.width, sprite.height);
-// @target end
+        graphics.tabSprite(target.row(), target.column(), sprite.x, sprite.y, sprite.width, sprite.height);
         int shade = target.hitRect().contains(mouseX, mouseY) ? 0x44333333 : 0x66333333;
         graphics.fill(sprite.x, sprite.y, sprite.right(), sprite.bottom(), shade);
         renderCenteredText(graphics,
@@ -2873,7 +2635,7 @@ public final class CreativeTabEditorController {
         }
     }
 
-    public void renderItemGroupBackground(GuiGraphics graphics, Slot slot) {
+    public void renderItemGroupBackground(EditorGraphics graphics, Slot slot) {
         if (!this.host.visualCreativeTabEditor$isCreativeSlot(slot)) { return; }
         CreativeItemGroups groups = itemGroups();
         int index = displayItemIndex(slot);
@@ -2882,12 +2644,18 @@ public final class CreativeTabEditorController {
         }
     }
 
-    public void renderItemGroupBadge(GuiGraphics graphics, Slot slot) {
+    public void renderCategoryFrame(EditorGraphics graphics) {
+        if (this.mode == Mode.NORMAL || this.mode == Mode.EDIT) {
+            this.categorySidebar.renderFrame(graphics);
+        }
+    }
+
+    public void renderItemGroupBadge(EditorGraphics graphics, Slot slot) {
         if (!this.host.visualCreativeTabEditor$isCreativeSlot(slot)) { return; }
         CreativeItemGroups groups = itemGroups();
         int index = displayItemIndex(slot);
         if (groups.isHeader(index)) {
-            CreativeItemGroupRenderer.badge(graphics, slot, groups.isExpanded(index));
+            CreativeItemGroupRenderer.badge(graphics, slot, groups.isExpanded(index), this.mode != Mode.NORMAL);
         }
     }
 
@@ -2912,7 +2680,7 @@ public final class CreativeTabEditorController {
             return -1;
         }
         if (currentType() != CreativeTabType.SEARCH) {
-            return absoluteItemIndex(slot);
+            return draftIndexForMenuItem(absoluteItemIndex(slot));
         }
         if (this.draft == null) {
             return -1;
@@ -2944,7 +2712,7 @@ public final class CreativeTabEditorController {
             }
             return -1;
         }
-        int index = absoluteItemIndex(slot);
+        int index = draftIndexForMenuItem(absoluteItemIndex(slot));
         if (index < 0) {
             return -1;
         }
@@ -2953,6 +2721,17 @@ public final class CreativeTabEditorController {
             index++;
         }
         return Math.min(index, size);
+    }
+
+    /** Native filters may shorten or reorder the list without changing the saved tab sequence. */
+    private int draftIndexForMenuItem(int sourceIndex) {
+        if (sourceIndex < 0) { return -1; }
+        List<ItemStack> items = this.host.visualCreativeTabEditor$menu().items;
+        if (sourceIndex >= items.size()) { return currentItemCount(); }
+        ItemStack item = items.get(sourceIndex);
+        CreativeTabDefinition definition = draft().currentTab().orElseThrow();
+        return sourceIndex < definition.itemCount() && definition.itemMatches(sourceIndex, item)
+                ? sourceIndex : draft().indexOfMatchingCurrentItem(item, -1);
     }
 
     private int indexOfMatchingPreparedSearchItem(ItemStack target) {
@@ -2977,14 +2756,14 @@ public final class CreativeTabEditorController {
             clearItemDragTabHover();
             return overTabStrip;
         }
-        ResourceLocation targetId = CreativeTabRuntime.id(hoveredTab).orElse(null);
-        ResourceLocation sourceId = draft().currentTabId().orElse(null);
+        ResourceId targetId = CreativeTabRuntime.id(hoveredTab).orElse(null);
+        ResourceId sourceId = draft().currentTabId().orElse(null);
         if (targetId == null || targetId.equals(sourceId)) {
             clearItemDragTabHover();
             return true;
         }
 
-        long now = Util.getMillis();
+        long now = NativeClock.millis();
         if (!targetId.equals(this.itemDragHoverTabId)) {
             this.itemDragHoverTabId = targetId;
             this.itemDragHoverStartedAt = now;
@@ -3090,7 +2869,7 @@ public final class CreativeTabEditorController {
         CreativeTabClientPlatform.PageState page = CreativeTabClientPlatform.pageState(
                 this.host.visualCreativeTabEditor$screen()
         );
-        long now = Util.getMillis();
+        long now = NativeClock.millis();
         if (direction != this.pageHoverDirection) {
             this.pageHoverDirection = direction;
             this.pageHoverOrigin = page.index();
@@ -3220,7 +2999,7 @@ public final class CreativeTabEditorController {
         if (this.draft == null) {
             return false;
         }
-        ResourceLocation screenTab = CreativeTabRuntime.id(this.host.visualCreativeTabEditor$selectedTab()).orElse(null);
+        ResourceId screenTab = CreativeTabRuntime.id(this.host.visualCreativeTabEditor$selectedTab()).orElse(null);
         return Objects.equals(screenTab, this.draft.currentTabId().orElse(null));
     }
 
@@ -3235,6 +3014,7 @@ public final class CreativeTabEditorController {
                 || buttonAt(x, y, deleteRect())
                 || buttonAt(x, y, sortRect())
                 || groupControlsAvailable() && buttonAt(x, y, groupControlsRect())
+                || canEditCategories() && (buttonAt(x, y, categoryEditRect()) || buttonAt(x, y, categoryDeleteRect()))
                 || isCreativeScrollbarAt(x, y);
     }
 
@@ -3245,7 +3025,7 @@ public final class CreativeTabEditorController {
                     reason,
                     this.pageHoverDirection,
                     this.pageHoverOrigin,
-                    Math.max(0L, Util.getMillis() - this.pageHoverStartedAt)
+                    Math.max(0L, NativeClock.millis() - this.pageHoverStartedAt)
             );
         }
         this.pageHoverDirection = 0;
@@ -3261,7 +3041,7 @@ public final class CreativeTabEditorController {
             List<CreativeTabDefinition> definitions = draft().tabs();
             List<Integer> visibleIndices = new ArrayList<>();
             for (CreativeModeTab visible : CreativeTabClientPlatform.visibleTabs(this.host.visualCreativeTabEditor$screen())) {
-                ResourceLocation visibleId = CreativeTabRuntime.id(visible).orElse(null);
+                ResourceId visibleId = CreativeTabRuntime.id(visible).orElse(null);
                 if (visibleId == null || COMMON_TAB_IDS.contains(visibleId)) {
                     continue;
                 }
@@ -3281,7 +3061,7 @@ public final class CreativeTabEditorController {
                     ? visibleIndices.stream().mapToInt(Integer::intValue).min().orElse(0)
                     : visibleIndices.stream().mapToInt(Integer::intValue).max().orElse(definitions.size() - 1) + 1;
         }
-        ResourceLocation id = CreativeTabRuntime.id(tab).orElse(null);
+        ResourceId id = CreativeTabRuntime.id(tab).orElse(null);
         if (id == null) {
             return draft().tabCount();
         }
@@ -3424,11 +3204,7 @@ public final class CreativeTabEditorController {
         Collection<ItemStack> runtime = this.host.visualCreativeTabEditor$selectedTab().getDisplayItems();
         List<ItemStack> displayed = expected;
         if (currentType() == CreativeTabType.SEARCH) {
-// @target if minecraft_version=1.20.1
-//|            Set<ItemStack> previousView = ItemStackLinkedSet.createTypeAndTagSet();
-// @target else
-            Set<ItemStack> previousView = ItemStackLinkedSet.createTypeAndComponentsSet();
-// @target end
+            Set<ItemStack> previousView = com.kltyton.visual_creative_tab_editor.platform.item.StackData.set();
             previousView.addAll(previousMenuItems);
             displayed = new ArrayList<>(previousMenuItems.size());
             for (ItemStack stack : expected) {
@@ -3490,11 +3266,7 @@ public final class CreativeTabEditorController {
         Iterator<ItemStack> right = actual.iterator();
         int index = 0;
         while (left.hasNext() && right.hasNext()) {
-// @target if minecraft_version=1.20.1
-//|            if (!ItemStack.isSameItemSameTags(left.next(), right.next())) {
-// @target else
-            if (!ItemStack.isSameItemSameComponents(left.next(), right.next())) {
-// @target end
+            if (!com.kltyton.visual_creative_tab_editor.platform.item.StackData.same(left.next(), right.next())) {
                 return index;
             }
             index++;
@@ -3504,11 +3276,7 @@ public final class CreativeTabEditorController {
 
     private static int indexOfMatching(List<ItemStack> items, ItemStack target) {
         for (int index = 0; index < items.size(); index++) {
-// @target if minecraft_version=1.20.1
-//|            if (ItemStack.isSameItemSameTags(items.get(index), target)) {
-// @target else
-            if (ItemStack.isSameItemSameComponents(items.get(index), target)) {
-// @target end
+            if (com.kltyton.visual_creative_tab_editor.platform.item.StackData.same(items.get(index), target)) {
                 return index;
             }
         }
@@ -3524,14 +3292,14 @@ public final class CreativeTabEditorController {
         if (this.draft == null || selected == null) {
             return;
         }
-        ResourceLocation selectedId = CreativeTabRuntime.id(selected).orElse(null);
+        ResourceId selectedId = CreativeTabRuntime.id(selected).orElse(null);
         CreativeTabDefinition definition = selectedId == null
                 ? null
                 : this.draft.definition(selectedId).orElse(null);
         if (definition == null || definition.type() != CreativeTabType.SEARCH) {
             return;
         }
-        ResourceLocation currentBefore = this.draft.currentTabId().orElse(null);
+        ResourceId currentBefore = this.draft.currentTabId().orElse(null);
         if (!selectedId.equals(currentBefore)) {
             this.draft.setCurrentTab(selectedId);
         }
@@ -3612,7 +3380,7 @@ public final class CreativeTabEditorController {
             sourceOrder.put(ordered.get(index), index);
         }
         ordered.sort(Comparator.comparingInt(tab -> {
-            ResourceLocation id = CreativeTabRuntime.id(tab).orElse(null);
+            ResourceId id = CreativeTabRuntime.id(tab).orElse(null);
             int known = id == null ? -1 : SEMANTIC_CATEGORY_ORDER.indexOf(id);
             return known >= 0
                     ? known
@@ -3650,8 +3418,7 @@ public final class CreativeTabEditorController {
     }
 
     private Rect sideActionRect(int row) {
-        return new Rect(sideControlX(), this.host.visualCreativeTabEditor$top() + 4 + row * (BUTTON_HEIGHT + 3),
-                BUTTON_WIDTH, BUTTON_HEIGHT);
+        return toolbarRect(toolbar().action(row));
     }
 
     private Rect undoRect() { return sideActionRect(2); }
@@ -3661,11 +3428,11 @@ public final class CreativeTabEditorController {
     private Rect globalSaveRect() { return sideActionRect(6); }
 
     private Rect saveRect() {
-        return new Rect(sideControlX(), this.host.visualCreativeTabEditor$top() + 4, BUTTON_WIDTH, BUTTON_HEIGHT);
+        return sideActionRect(0);
     }
 
     private Rect cancelRect() {
-        return new Rect(sideControlX(), this.host.visualCreativeTabEditor$top() + BUTTON_HEIGHT + 7, BUTTON_WIDTH, BUTTON_HEIGHT);
+        return sideActionRect(1);
     }
 
     private Rect sortRect() {
@@ -3685,16 +3452,12 @@ public final class CreativeTabEditorController {
         return Math.max(2, this.host.visualCreativeTabEditor$top() - 53);
     }
 
-    private int sideControlX() {
-        int left = this.host.visualCreativeTabEditor$left();
-        if (left >= BUTTON_WIDTH + 6) {
-            return left - BUTTON_WIDTH - 4;
-        }
-        int right = left + this.host.visualCreativeTabEditor$imageWidth();
-        if (this.host.visualCreativeTabEditor$screenWidth() - right >= BUTTON_WIDTH + 6) {
-            return right + 4;
-        }
-        return 2;
+    private CreativeTabEditorToolbar toolbar() {
+        return CreativeTabEditorToolbar.layout(this.host, this.categorySidebar.reservedLeftEdge(), this.mode != Mode.NORMAL);
+    }
+
+    private static Rect toolbarRect(CreativeTabEditorToolbar.Bounds bounds) {
+        return new Rect(bounds.x(), bounds.y(), bounds.width(), bounds.height());
     }
 
     private @Nullable TabPlusTarget tabPlusTarget() {
@@ -3907,23 +3670,14 @@ public final class CreativeTabEditorController {
         );
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    private void traceDragStart(Press active, MouseButtonEvent event, Mode dragMode) {
-// @target else
-    private void traceDragStart(Press active, double mouseX, double mouseY, Mode dragMode) {
-// @target end
+    private void traceDragStart(Press active, Pointer event, Mode dragMode) {
         if (active.dragStartedLogged) {
             return;
         }
         active.dragStartedLogged = true;
         this.dragVisual = createDragVisual(active);
-// @target if minecraft_version=26.1.2,26.2
-//|        double ghostX = this.dragVisual == null ? event.x() - 8.0D : event.x() - this.dragVisual.grabOffsetX;
-//|        double ghostY = this.dragVisual == null ? event.y() - 8.0D : event.y() - this.dragVisual.grabOffsetY;
-// @target else
-        double ghostX = this.dragVisual == null ? mouseX - 8.0D : mouseX - this.dragVisual.grabOffsetX;
-        double ghostY = this.dragVisual == null ? mouseY - 8.0D : mouseY - this.dragVisual.grabOffsetY;
-// @target end
+        double ghostX = this.dragVisual == null ? event.x() - 8.0D : event.x() - this.dragVisual.grabOffsetX;
+        double ghostY = this.dragVisual == null ? event.y() - 8.0D : event.y() - this.dragVisual.grabOffsetY;
         trace(
                 "drag-start mode={} sourceKind={} longTriggered={} currentTab={} currentType={} selectedItems={} tab={} item={} pointer=({}, {}) ghostTopLeft=({}, {}) grabOffset=({}, {}) contextTarget=({}, {})",
                 dragMode,
@@ -3934,13 +3688,8 @@ public final class CreativeTabEditorController {
                 draft().selectedItemIndices().size(),
                 tabId(active.tab),
                 itemId(active.slot),
-// @target if minecraft_version=26.1.2,26.2
-//|                event.x(),
-//|                event.y(),
-// @target else
-                mouseX,
-                mouseY,
-// @target end
+                event.x(),
+                event.y(),
                 ghostX,
                 ghostY,
                 this.dragVisual == null ? 8.0D : this.dragVisual.grabOffsetX,
@@ -3954,7 +3703,7 @@ public final class CreativeTabEditorController {
         ItemStack icon;
         Rect origin;
         if (active.tab != null) {
-            ResourceLocation id = CreativeTabRuntime.id(active.tab).orElse(null);
+            ResourceId id = CreativeTabRuntime.id(active.tab).orElse(null);
             icon = id == null
                     ? active.tab.getIconItem()
                     : draft().definition(id).map(CreativeTabDefinition::icon).orElseGet(active.tab::getIconItem);
@@ -4008,14 +3757,14 @@ public final class CreativeTabEditorController {
     private static String tabId(@Nullable CreativeModeTab tab) {
         return tab == null
                 ? "-"
-                : CreativeTabRuntime.id(tab).map(ResourceLocation::toString).orElse("<unregistered>");
+                : CreativeTabRuntime.id(tab).map(ResourceId::toString).orElse("<unregistered>");
     }
 
     private static String itemId(@Nullable Slot slot) {
         if (slot == null || !slot.hasItem()) {
             return "-";
         }
-        ResourceLocation id = BuiltInRegistries.ITEM.getKey(slot.getItem().getItem());
+        ResourceId id = com.kltyton.visual_creative_tab_editor.platform.registry.NativeIds.wrap(BuiltInRegistries.ITEM.getKey(slot.getItem().getItem()));
         return id == null ? "<unregistered>" : id.toString();
     }
 
@@ -4023,7 +3772,7 @@ public final class CreativeTabEditorController {
         if (stack.isEmpty()) {
             return "empty";
         }
-        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceId id = com.kltyton.visual_creative_tab_editor.platform.registry.NativeIds.wrap(BuiltInRegistries.ITEM.getKey(stack.getItem()));
         return (id == null ? "<unregistered>" : id.toString()) + "x" + stack.getCount();
     }
 
@@ -4035,7 +3784,7 @@ public final class CreativeTabEditorController {
         return Objects.requireNonNull(this.draft, "editor draft");
     }
 
-    private ResourceLocation requireContextTab() {
+    private ResourceId requireContextTab() {
         return Objects.requireNonNull(this.contextTabId, "context tab");
     }
 
@@ -4097,14 +3846,14 @@ public final class CreativeTabEditorController {
 
     private static final class Press {
         private final PressKind kind;
-        private final long startedAt = Util.getMillis();
+        private final long startedAt = NativeClock.millis();
         private final double x;
         private final double y;
         private final @Nullable CreativeModeTab tab;
         private final @Nullable Slot slot;
         private final int slotId;
         private final int button;
-        private final @Nullable ClickType input;
+        private final @Nullable SlotInput input;
         private int itemIndex;
         private @Nullable String groupId;
         private @Nullable String originGroupId;
@@ -4114,10 +3863,7 @@ public final class CreativeTabEditorController {
         private boolean dropTargetCaptured;
         private double dropX;
         private double dropY;
-// @target if minecraft_version=26.1.2,26.2
-//|        private final boolean doubleClick;
-// @target else
-// @target end
+        private final boolean doubleClick;
         private boolean longTriggered;
         private boolean cancelled;
         private boolean moved;
@@ -4134,13 +3880,9 @@ public final class CreativeTabEditorController {
                 @Nullable Slot slot,
                 int slotId,
                 int button,
-                @Nullable ClickType input,
-// @target if minecraft_version=26.1.2,26.2
-//|                int itemIndex,
-//|                boolean doubleClick
-// @target else
-                int itemIndex
-// @target end
+                @Nullable SlotInput input,
+                int itemIndex,
+                boolean doubleClick
         ) {
             this.kind = kind;
             this.x = x;
@@ -4151,26 +3893,15 @@ public final class CreativeTabEditorController {
             this.button = button;
             this.input = input;
             this.itemIndex = itemIndex;
-// @target if minecraft_version=26.1.2,26.2
-//|            this.doubleClick = doubleClick;
-// @target else
-// @target end
+            this.doubleClick = doubleClick;
         }
 
         private static Press tab(PressKind kind, CreativeModeTab tab, double x, double y) {
-// @target if minecraft_version=26.1.2,26.2
-//|            return new Press(kind, x, y, tab, null, -1, 0, null, -1, false);
-// @target else
-            return new Press(kind, x, y, tab, null, -1, 0, null, -1);
-// @target end
+            return new Press(kind, x, y, tab, null, -1, 0, null, -1, false);
         }
 
         private static Press item(PressKind kind, Slot slot, int itemIndex, double x, double y) {
-// @target if minecraft_version=26.1.2,26.2
-//|            return new Press(kind, x, y, null, slot, slot.index, 0, ClickType.PICKUP, itemIndex, false);
-// @target else
-            return new Press(kind, x, y, null, slot, slot.index, 0, ClickType.PICKUP, itemIndex);
-// @target end
+            return new Press(kind, x, y, null, slot, slot.index, 0, SlotInput.PICKUP, itemIndex, false);
         }
 
         private static Press slot(
@@ -4178,29 +3909,17 @@ public final class CreativeTabEditorController {
                 Slot slot,
                 int slotId,
                 int button,
-                ClickType input,
+                SlotInput input,
                 int itemIndex,
                 double x,
-// @target if minecraft_version=26.1.2,26.2
-//|                double y,
-//|                boolean doubleClick
-// @target else
-                double y
-// @target end
+                double y,
+                boolean doubleClick
         ) {
-// @target if minecraft_version=26.1.2,26.2
-//|            return new Press(kind, x, y, null, slot, slotId, button, input, itemIndex, doubleClick);
-// @target else
-            return new Press(kind, x, y, null, slot, slotId, button, input, itemIndex);
-// @target end
+            return new Press(kind, x, y, null, slot, slotId, button, input, itemIndex, doubleClick);
         }
 
         private static Press blank(double x, double y) {
-// @target if minecraft_version=26.1.2,26.2
-//|            return new Press(PressKind.BLANK_TAB, x, y, null, null, -1, 0, null, -1, false);
-// @target else
-            return new Press(PressKind.BLANK_TAB, x, y, null, null, -1, 0, null, -1);
-// @target end
+            return new Press(PressKind.BLANK_TAB, x, y, null, null, -1, 0, null, -1, false);
         }
 
         private double distanceSquared(double mouseX, double mouseY) {

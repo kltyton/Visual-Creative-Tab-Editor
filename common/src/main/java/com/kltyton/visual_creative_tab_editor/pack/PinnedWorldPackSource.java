@@ -2,21 +2,8 @@ package com.kltyton.visual_creative_tab_editor.pack;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-// @target if minecraft_version=1.20.1
-// @target else
-import java.util.Optional;
-// @target end
 import java.util.function.Consumer;
-import net.minecraft.network.chat.Component;
-// @target if minecraft_version=1.20.1
-// @target else
-import net.minecraft.server.packs.PackLocationInfo;
-import net.minecraft.server.packs.PackSelectionConfig;
-// @target end
-import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.PathPackResources;
 import net.minecraft.server.packs.repository.Pack;
-import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.repository.RepositorySource;
 
 /** Supplies the two world-local packs with non-negotiable boundary priorities. */
@@ -28,14 +15,6 @@ public final class PinnedWorldPackSource implements RepositorySource {
     public static final String DEFAULT_PACK_ID = "file/" + DEFAULT_DIRECTORY;
     public static final String PLAYER_PACK_ID = "file/" + PLAYER_DIRECTORY;
 
-// @target if minecraft_version=1.20.1
-// @target else
-    private static final PackSelectionConfig DEFAULT_SELECTION =
-            new PackSelectionConfig(true, Pack.Position.BOTTOM, true);
-    private static final PackSelectionConfig PLAYER_SELECTION =
-            new PackSelectionConfig(true, Pack.Position.TOP, true);
-
-// @target end
     private final Path datapackDirectory;
 
     public PinnedWorldPackSource(Path datapackDirectory) {
@@ -49,22 +28,14 @@ public final class PinnedWorldPackSource implements RepositorySource {
                 DEFAULT_DIRECTORY,
                 LEGACY_DEFAULT_DIRECTORY,
                 DEFAULT_PACK_ID,
-// @target if minecraft_version=1.20.1
-//|                Pack.Position.BOTTOM
-// @target else
-                DEFAULT_SELECTION
-// @target end
+                Pack.Position.BOTTOM
         );
         loadPreferred(
                 consumer,
                 PLAYER_DIRECTORY,
                 LEGACY_PLAYER_DIRECTORY,
                 PLAYER_PACK_ID,
-// @target if minecraft_version=1.20.1
-//|                Pack.Position.TOP
-// @target else
-                PLAYER_SELECTION
-// @target end
+                Pack.Position.TOP
         );
     }
 
@@ -73,59 +44,22 @@ public final class PinnedWorldPackSource implements RepositorySource {
             String currentDirectory,
             String legacyDirectory,
             String packId,
-// @target if minecraft_version=1.20.1
-//|            Pack.Position position
-// @target else
-            PackSelectionConfig selection
-// @target end
+            Pack.Position position
     ) {
         Path currentRoot = this.datapackDirectory.resolve(currentDirectory).normalize();
         String selectedDirectory = Files.isRegularFile(currentRoot.resolve("pack.mcmeta"))
                 ? currentDirectory
                 : legacyDirectory;
-// @target if minecraft_version=1.20.1
-//|        load(consumer, selectedDirectory, packId, position);
-// @target else
-        load(consumer, selectedDirectory, packId, selection);
-// @target end
+        load(consumer, selectedDirectory, packId, position);
     }
 
-// @target if minecraft_version=1.20.1
-//|    private void load(Consumer<Pack> consumer, String directoryName, String packId, Pack.Position position) {
-// @target else
-    private void load(Consumer<Pack> consumer, String directoryName, String packId, PackSelectionConfig selection) {
-// @target end
+    private void load(Consumer<Pack> consumer, String directoryName, String packId, Pack.Position position) {
         Path root = this.datapackDirectory.resolve(directoryName).normalize();
         if (!root.startsWith(this.datapackDirectory) || !Files.isRegularFile(root.resolve("pack.mcmeta"))) {
             return;
         }
 
-// @target if minecraft_version=1.20.1
-//|        Pack pack = Pack.readMetaAndCreate(
-// @target else
-        PackLocationInfo location = new PackLocationInfo(
-// @target end
-                packId,
-                Component.literal(directoryName),
-// @target if minecraft_version=1.20.1
-//|                true,
-//|                openedId -> new PathPackResources(openedId, root, false),
-// @target else
-                PackSource.WORLD,
-                Optional.empty()
-        );
-        Pack pack = Pack.readMetaAndCreate(
-                location,
-                new PathPackResources.PathResourcesSupplier(root),
-// @target end
-                PackType.SERVER_DATA,
-// @target if minecraft_version=1.20.1
-//|                position,
-//|                PackSource.WORLD
-// @target else
-                selection
-// @target end
-        );
+        Pack pack = com.kltyton.visual_creative_tab_editor.platform.pack.NativePinnedPack.open(root, packId, directoryName, position);
         if (pack != null) {
             consumer.accept(pack);
         }

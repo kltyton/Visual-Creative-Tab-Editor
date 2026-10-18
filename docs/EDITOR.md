@@ -3,7 +3,37 @@
 The server grants editing to players with the vanilla game-master command
 permission. All changes are validated and saved by the logical server.
 
+## Subcategories within a creative tab
+
+The icon tabs attached to the inventory's left edge select subcategories inside
+the current creative tab. Shift-click combines categories; the compass restores
+all items and the paper selects uncategorized items. The arrows and mouse wheel
+page the sidebar, and its top control collapses it without clearing the filter.
+
+Category tabs use vanilla left-tab textures; navigation and editing controls use
+Ore styling. Native mod filters keep their positions and input regions. A joined
+frame connects the outer category tabs to the inventory, and selected categories
+intersect the native filter result.
+
+While editing, the sidebar's `+` creates a category and opens its name/icon
+editor. **Categories** provides membership, order and deletion controls. Category
+definitions use the normal Save, Cancel and Undo flow. Deleting a category keeps
+the parent tab's items.
+
+```mermaid
+flowchart LR
+    A[Current native item list] --> C[Intersection]
+    B[Left icon sub-tabs] --> S[Selected category union]
+    S --> C
+    C --> G[Item group projection]
+    G --> I[Inventory grid]
+```
+
 ## Entering edit mode
+
+Tab and item drawers start collapsed behind a small Ore arrow on the inventory's
+right edge. It reveals book and chest icon buttons. Closing a drawer or reopening
+the inventory hides those buttons. Folder expansion and source filters are retained.
 
 - Hold a tab icon for 500 ms to open its Modify/Delete menu.
 - Hold an item in a category tab for 500 ms to open its Modify/Delete menu.

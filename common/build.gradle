@@ -1,0 +1,114 @@
+import groovy.json.JsonOutput
+import org.gradle.api.artifacts.ProjectDependency
+
+plugins { id 'java-library' }
+
+def commonRoot = buildFile.canonicalFile.parentFile
+def templeRoot = commonRoot.parentFile
+def identity = new Properties()
+new File(templeRoot, 'gradle.properties').withReader('UTF-8') { identity.load(it) }
+def loader = rootProject.property('loader').toString()
+def minecraft = rootProject.property('minecraft_version').toString()
+def javaVersion = rootProject.property('java_version') as int
+def targetId = "${loader}-${minecraft}"
+def selection = new File(templeRoot, '.temple/active-target')
+def active = (selection.isFile() ? selection.getText('UTF-8').trim() : identity.getProperty('temple_default_target')) == targetId
+group = identity.getProperty('mod_group_id')
+version = identity.getProperty('mod_version')
+base.archivesName = "${identity.getProperty('mod_id')}-common-${targetId}"
+layout.buildDirectory.set(new File(commonRoot, "build/${targetId}"))
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(javaVersion)
+    withSourcesJar()
+}
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public' }
+    maven { url = 'https://maven.fabricmc.net/' }
+}
+dependencies {
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.1'
+    if (javaVersion >= 25) {
+        compileOnly 'net.fabricmc:sponge-mixin:0.17.3+mixin.0.8.7'
+        compileOnly(annotationProcessor('io.github.llamalad7:mixinextras-common:0.5.3'))
+    } else if (loader != 'fabric') {
+        compileOnly 'org.spongepowered:mixin:0.8.5'
+    }
+}
+
+def families = javaVersion >= 25 ? ['components', 'extraction'] :
+        (javaVersion >= 21 ? ['legacy', 'components'] : ['legacy'])
+if (javaVersion < 25 && loader != 'neoforge') families.add('text_shadow')
+def layers = [new File(commonRoot, 'src/main')] +
+        families.collect { new File(commonRoot, "src/compat/minecraft/${it}") } +
+        [new File(commonRoot, "src/compat/minecraft/${minecraft}"),
+         new File(commonRoot, "src/compat/${loader}"),
+         javaVersion >= 21 ? new File(commonRoot, "src/compat/${loader}/components") : null,
+         javaVersion >= 25 ? new File(commonRoot, "src/compat/${loader}/extraction") : null,
+         new File(commonRoot, "src/compat/${loader}/${minecraft}")]
+layers = layers.findAll { it != null && it.isDirectory() }
+def javaDirectories = layers.collect { new File(it, 'java') }.findAll { it.isDirectory() }
+def resourceDirectories = layers.reverse().collect { new File(it, 'resources') }.findAll { it.isDirectory() }
+def packageName = identity.getProperty('mod_java_package', identity.getProperty('mod_group_id'))
+def constants = new File(layout.buildDirectory.get().asFile, 'generated/sources/temple')
+def constantFile = new File(constants, "${packageName.replace('.', '/')}/BuildInfo.java")
+def constantText = "package ${packageName};\n\npublic final class BuildInfo {\n" +
+        "    public static final String MOD_ID = ${JsonOutput.toJson(identity.getProperty('mod_id'))};\n" +
+        "    private BuildInfo() {}\n}\n"
+if (!constantFile.isFile() || constantFile.getText('UTF-8') != constantText) {
+    constantFile.parentFile.mkdirs()
+    constantFile.setText(constantText, 'UTF-8')
+}
+sourceSets {
+    main {
+        java.setSrcDirs(active ? javaDirectories + [constants] : [])
+        resources.setSrcDirs(active ? resourceDirectories : [])
+    }
+    test {
+        java.setSrcDirs(active ? [new File(commonRoot, 'src/test/java')] : [])
+        resources.setSrcDirs(active ? [new File(commonRoot, 'src/test/resources')] : [])
+    }
+}
+tasks.named('compileJava', JavaCompile) { source javaDirectories, constants }
+tasks.named('compileTestJava', JavaCompile) { source new File(commonRoot, 'src/test/java') }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = javaVersion
+}
+tasks.named('processResources', ProcessResources) {
+    from resourceDirectories
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    def values = ['mod_id', 'mod_name', 'mod_version', 'mod_group_id', 'mod_authors', 'mod_license', 'mod_description']
+            .collectEntries { key -> [(key): identity.getProperty(key)] }
+    values.putAll([minecraft_version: minecraft, java_version: javaVersion])
+    def escaped = values.collectEntries { key, value ->
+        def encoded = JsonOutput.toJson(value.toString())
+        [(key): encoded.substring(1, encoded.length() - 1)]
+    }
+    inputs.properties(values)
+    filesMatching(['*.mixins.json', 'pack.mcmeta']) { expand escaped }
+}
+tasks.named('processTestResources', ProcessResources) { from new File(commonRoot, 'src/test/resources') }
+tasks.named('sourcesJar', Jar) {
+    from javaDirectories
+    from constants
+    from resourceDirectories
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+def commonPath = path
+def commonSourceSets = sourceSets
+def commonCompile = tasks.named('compileJava', JavaCompile)
+def commonAnnotationProcessors = configurations.annotationProcessor
+rootProject.afterEvaluate {
+    def sdk = rootProject.configurations.compileClasspath.copyRecursive { dependency ->
+        !(dependency instanceof ProjectDependency && dependency.path == commonPath)
+    }
+    commonSourceSets.main.compileClasspath += sdk
+    commonSourceSets.test.compileClasspath += sdk
+    commonCompile.configure {
+        options.annotationProcessorPath = files(commonAnnotationProcessors,
+                rootProject.tasks.named('compileJava', JavaCompile).get().options.annotationProcessorPath)
+    }
+}
+ext.templeResourceDirectories = resourceDirectories
+ext.templeSourceDirectories = javaDirectories + [constants]

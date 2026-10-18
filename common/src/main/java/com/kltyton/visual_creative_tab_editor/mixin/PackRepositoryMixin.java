@@ -52,11 +52,7 @@ public abstract class PackRepositoryMixin {
         if (top) {
             packs.add(pinned);
         } else {
-// @target if minecraft_version=1.20.1
-//|            packs.add(0, pinned);
-// @target else
-            packs.addFirst(pinned);
-// @target end
+            packs.add(0, pinned);
         }
     }
 }

@@ -7,7 +7,7 @@ import java.util.Collection;
 import java.util.Set;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,13 +17,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+/** Projects server-authoritative tab properties and contents into the native tab. */
 @Mixin(CreativeModeTab.class)
 public abstract class CreativeModeTabMixin implements com.kltyton.visual_creative_tab_editor.runtime.CreativeTabContents {
-// @target if minecraft_version=1.20.1
-//|    private static final String VANILLA_BACKGROUND_PREFIX = "textures/gui/container/creative_inventory/tab_";
-//|
-// @target else
-// @target end
     @Shadow
     private Collection<ItemStack> displayItems;
 
@@ -33,11 +29,7 @@ public abstract class CreativeModeTabMixin implements com.kltyton.visual_creativ
     @Override
     public void visualCreativeTabEditor$replaceContents(Collection<ItemStack> display, Collection<ItemStack> searchable) {
         Collection<ItemStack> newDisplay = new java.util.ArrayList<>(display);
-// @target if minecraft_version=1.20.1
-//|        Set<ItemStack> newSearch = net.minecraft.world.item.ItemStackLinkedSet.createTypeAndTagSet();
-// @target else
-        Set<ItemStack> newSearch = net.minecraft.world.item.ItemStackLinkedSet.createTypeAndComponentsSet();
-// @target end
+        Set<ItemStack> newSearch = com.kltyton.visual_creative_tab_editor.platform.item.StackData.set();
         newSearch.addAll(searchable);
         this.displayItems = newDisplay;
         this.displayItemsSearchTab = newSearch;
@@ -53,24 +45,6 @@ public abstract class CreativeModeTabMixin implements com.kltyton.visual_creativ
     private void visualCreativeTabEditor$getIcon(CallbackInfoReturnable<ItemStack> callback) {
         CreativeTabRuntime.definition((CreativeModeTab) (Object) this)
                 .ifPresent(definition -> callback.setReturnValue(definition.icon()));
-    }
-
-// @target if minecraft_version=1.20.1
-//|    @Inject(method = "getBackgroundSuffix", at = @At("HEAD"), cancellable = true)
-//|    private void visualCreativeTabEditor$getBackground(CallbackInfoReturnable<String> callback) {
-//|        CreativeTabRuntime.definition((CreativeModeTab) (Object) this).ifPresent(definition -> {
-//|            ResourceLocation background = definition.layout().background();
-//|            if (background.getNamespace().equals("minecraft")
-//|                    && background.getPath().startsWith(VANILLA_BACKGROUND_PREFIX)) {
-//|                callback.setReturnValue(background.getPath().substring(VANILLA_BACKGROUND_PREFIX.length()));
-//|            }
-//|        });
-// @target else
-    @Inject(method = "getBackgroundTexture", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$getBackground(CallbackInfoReturnable<ResourceLocation> callback) {
-        CreativeTabRuntime.definition((CreativeModeTab) (Object) this)
-                .ifPresent(definition -> callback.setReturnValue(definition.layout().background()));
-// @target end
     }
 
     @Inject(method = "showTitle", at = @At("HEAD"), cancellable = true)
@@ -133,24 +107,6 @@ public abstract class CreativeModeTabMixin implements com.kltyton.visual_creativ
         callback.cancel();
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    @Inject(method = "buildContents", at = @At("TAIL"), order = 1100)
-// @target else
-    @Inject(method = "buildContents", at = @At("TAIL"))
-// @target end
-    private void visualCreativeTabEditor$applyRegisteredTabContents(
-            CreativeModeTab.ItemDisplayParameters parameters,
-            CallbackInfo callback
-    ) {
-        CreativeModeTab self = (CreativeModeTab) (Object) this;
-        CreativeTabDefinition definition = CreativeTabRuntime.definition(self).orElse(null);
-        if (definition != null
-                && definition.type() == CreativeTabType.CATEGORY
-                && BuiltInRegistries.CREATIVE_MODE_TAB.getKey(self) != null) {
-            applyDefinitionContents(definition, parameters);
-        }
-    }
-
     private void applyDefinitionContents(
             CreativeTabDefinition definition,
             CreativeModeTab.ItemDisplayParameters parameters
@@ -165,11 +121,18 @@ public abstract class CreativeModeTabMixin implements com.kltyton.visual_creativ
 
     private boolean isOperatorUtilities() {
         return CreativeTabRuntime.id((CreativeModeTab) (Object) this)
-// @target if minecraft_version=1.20.1
-//|                .filter(id -> id.equals(new ResourceLocation("minecraft", "op_blocks")))
-// @target else
-                .filter(id -> id.equals(ResourceLocation.withDefaultNamespace("op_blocks")))
-// @target end
+                .filter(id -> id.equals(ResourceId.withDefaultNamespace("op_blocks")))
                 .isPresent();
+    }
+    @Override
+    public void visualCreativeTabEditor$applyRegisteredContents(CreativeModeTab.ItemDisplayParameters parameters) {
+        CreativeModeTab self = (CreativeModeTab) (Object) this;
+        CreativeTabDefinition definition = CreativeTabRuntime.definition(self).orElse(null);
+        if (definition != null
+                && definition.type() == CreativeTabType.CATEGORY
+                && BuiltInRegistries.CREATIVE_MODE_TAB.getKey(self) != null) {
+            applyDefinitionContents(definition, parameters);
+        }
+    
     }
 }

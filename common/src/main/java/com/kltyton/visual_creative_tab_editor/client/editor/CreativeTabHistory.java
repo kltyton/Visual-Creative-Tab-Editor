@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 
 /** A world's committed edit history, copied into each editing session. */
 public final class CreativeTabHistory {
@@ -28,7 +28,7 @@ public final class CreativeTabHistory {
     private boolean preservePrevious;
     private boolean readable = true;
 
-    public record State(CreativeTabCatalog catalog, ResourceLocation currentTab) { }
+    public record State(CreativeTabCatalog catalog, ResourceId currentTab) { }
 
     private CreativeTabHistory(Path file, State anchor) {
         this.file = file;
@@ -192,7 +192,7 @@ public final class CreativeTabHistory {
             List<CreativeTabDefinition> definitions = new ArrayList<>();
             for (var value : tabs) {
                 JsonObject tab = value.getAsJsonObject();
-                ResourceLocation id = Objects.requireNonNull(ResourceLocation.tryParse(tab.get("id").getAsString()));
+                ResourceId id = Objects.requireNonNull(ResourceId.tryParse(tab.get("id").getAsString()));
                 CreativeTabDefinition definition = base.definition(id).orElse(null);
                 if (tab.has("data")) {
                     CreativeTabPatch patch = CreativeTabJsonCodec.decodePatch(tab.get("data"), registries);
@@ -200,12 +200,12 @@ public final class CreativeTabHistory {
                 }
                 definitions.add(Objects.requireNonNull(definition));
                 items += (long) definition.itemCount() + definition.searchItemCount()
-                        + definition.grouping().referencedItemCount();
+                        + definition.grouping().referencedItemCount() + definition.categories().referencedItemCount();
                 if (items > MAX_RETAINED_ITEMS) {
                     throw new IOException("History exceeds retained item capacity");
                 }
             }
-            ResourceLocation selected = entry.has("selected") ? ResourceLocation.tryParse(entry.get("selected").getAsString()) : null;
+            ResourceId selected = entry.has("selected") ? ResourceId.tryParse(entry.get("selected").getAsString()) : null;
             destination.addLast(new State(new CreativeTabCatalog(definitions), selected));
         }
     }
@@ -216,7 +216,7 @@ public final class CreativeTabHistory {
             for (State state : states) {
                 for (CreativeTabDefinition definition : state.catalog().orderedDefinitions()) {
                     items += (long) definition.itemCount() + definition.searchItemCount()
-                            + definition.grouping().referencedItemCount();
+                            + definition.grouping().referencedItemCount() + definition.categories().referencedItemCount();
                 }
             }
         }
@@ -225,7 +225,7 @@ public final class CreativeTabHistory {
             State removed = !this.undo.isEmpty() ? this.undo.removeFirst() : this.redo.removeFirst();
             for (CreativeTabDefinition definition : removed.catalog().orderedDefinitions()) {
                 items -= (long) definition.itemCount() + definition.searchItemCount()
-                        + definition.grouping().referencedItemCount();
+                        + definition.grouping().referencedItemCount() + definition.categories().referencedItemCount();
             }
         }
     }

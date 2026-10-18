@@ -2,39 +2,39 @@ package com.kltyton.visual_creative_tab_editor.client.editor;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorGraphics;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
-// @target if minecraft_version=26.1.2,26.2
-//|import net.minecraft.client.input.CharacterEvent;
-//|import net.minecraft.client.input.KeyEvent;
-//|import net.minecraft.client.input.MouseButtonEvent;
-//|import net.minecraft.client.input.PreeditEvent;
-// @target else
-// @target end
-import net.minecraft.world.inventory.ClickType;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Character;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Key;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Pointer;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Preedit;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.SlotInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
-// @target if minecraft_version=26.1.2,26.2
-//|import org.jetbrains.annotations.Nullable;
-// @target else
-// @target end
+import javax.annotation.Nullable;
 
 /** Narrow bridge from the screen Mixin to the loader-neutral editor controller. */
 public interface CreativeTabEditorHost {
+    CreativeTabEditorController visualCreativeTabEditor$editor();
+
     CreativeModeInventoryScreen visualCreativeTabEditor$screen();
 
     boolean visualCreativeTabEditor$suppressesTooltips();
 
-    void visualCreativeTabEditor$renderItemGroupBackground(GuiGraphics graphics, Slot slot);
+    void visualCreativeTabEditor$renderItemGroupBackground(EditorGraphics graphics, Slot slot);
 
-    void visualCreativeTabEditor$renderItemGroupBadge(GuiGraphics graphics, Slot slot);
+    void visualCreativeTabEditor$renderItemGroupBadge(EditorGraphics graphics, Slot slot);
+
+    void visualCreativeTabEditor$renderCategoryFrame(EditorGraphics graphics);
 
     void visualCreativeTabEditor$renderEditorOverlay(
-            GuiGraphics graphics,
+            EditorGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick
     );
+
+    void visualCreativeTabEditor$arrangeDataDrivenTabs();
 
     Minecraft visualCreativeTabEditor$minecraft();
 
@@ -80,52 +80,30 @@ public interface CreativeTabEditorHost {
 
     boolean visualCreativeTabEditor$isTitleEditorAt(double mouseX, double mouseY);
 
-// @target if minecraft_version=26.1.2,26.2
-//|    void visualCreativeTabEditor$extractTitleEditor(
-// @target else
     void visualCreativeTabEditor$renderTitleEditor(
-// @target end
-            GuiGraphics graphics,
+            EditorGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick
     );
 
-// @target if minecraft_version=26.1.2,26.2
-//|    boolean visualCreativeTabEditor$titleEditorKeyPressed(KeyEvent event);
-// @target else
-    boolean visualCreativeTabEditor$titleEditorKeyPressed(int keyCode, int scanCode, int modifiers);
-// @target end
+    boolean visualCreativeTabEditor$titleEditorKeyPressed(Key event);
 
-// @target if minecraft_version=26.1.2,26.2
-//|    boolean visualCreativeTabEditor$titleEditorCharTyped(CharacterEvent event);
-//|
-//|    boolean visualCreativeTabEditor$titleEditorPreeditUpdated(@Nullable PreeditEvent event);
-// @target else
-    boolean visualCreativeTabEditor$titleEditorCharTyped(char codePoint, int modifiers);
-// @target end
+    boolean visualCreativeTabEditor$titleEditorCharTyped(Character event);
+
+    boolean visualCreativeTabEditor$titleEditorPreeditUpdated(@Nullable Preedit event);
 
     boolean visualCreativeTabEditor$titleEditorMouseDragged(
-// @target if minecraft_version=26.1.2,26.2
-//|            MouseButtonEvent event,
-// @target else
-            double mouseX,
-            double mouseY,
-            int button,
-// @target end
+            Pointer event,
             double deltaX,
             double deltaY
     );
 
-// @target if minecraft_version=26.1.2,26.2
-//|    boolean visualCreativeTabEditor$titleEditorMouseReleased(MouseButtonEvent event);
-// @target else
-    boolean visualCreativeTabEditor$titleEditorMouseReleased(double mouseX, double mouseY, int button);
-// @target end
+    boolean visualCreativeTabEditor$titleEditorMouseReleased(Pointer event);
 
     void visualCreativeTabEditor$hideTitleEditor();
 
-    void visualCreativeTabEditor$replaySlotClick(Slot slot, int slotId, int button, ClickType input);
+    void visualCreativeTabEditor$replaySlotClick(Slot slot, int slotId, int button, SlotInput input);
 
     void visualCreativeTabEditor$refreshScreen();
 }

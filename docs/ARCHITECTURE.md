@@ -39,6 +39,21 @@ preview into the logical server. Saving submits the draft; canceling discards it
 Fabric and NeoForge keep their own native pagination, with thin loader-specific
 ordering adapters.
 
+Within-tab categories retain separate immutable definitions from expandable item
+groups. Their browsing selection intersects the current native menu items before
+the visible group projection is built. The menu item list reports mutations from
+vanilla and third-party filters to the projection cache, including same-size
+replacement and reordering. Native filtering callbacks retain their item
+mutations and scrolling operations.
+
+```mermaid
+flowchart LR
+    A[Native menu mutations] --> B[Projection invalidation]
+    C[Category choices] --> B
+    B --> D[Category and group projection]
+    D --> E[Creative slots and scroll range]
+```
+
 ## Access policy
 
 Members that only need wider Java access use loader-native transformation:

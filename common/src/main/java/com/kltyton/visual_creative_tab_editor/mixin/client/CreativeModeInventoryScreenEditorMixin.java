@@ -1,9 +1,5 @@
 package com.kltyton.visual_creative_tab_editor.mixin.client;
 
-// @target if minecraft_version=1.20.1
-//|import com.mojang.blaze3d.vertex.PoseStack;
-// @target else
-// @target end
 import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import com.kltyton.visual_creative_tab_editor.client.editor.CreativeTabEditorController;
 import com.kltyton.visual_creative_tab_editor.client.editor.CreativeTabEditorHost;
@@ -17,39 +13,25 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-// @target if minecraft_version=1.20.1
-//|import javax.annotation.Nullable;
-// @target elif minecraft_version=26.1.2,26.2
-// @target else
-import org.jetbrains.annotations.Nullable;
-// @target end
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorGraphics;
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorTheme;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.network.chat.Component;
-// @target if minecraft_version=1.20.1
-//|import net.minecraft.resources.ResourceLocation;
-// @target elif minecraft_version=26.1.2,26.2
-//|import net.minecraft.client.input.CharacterEvent;
-//|import net.minecraft.client.input.KeyEvent;
-//|import net.minecraft.client.input.MouseButtonEvent;
-//|import net.minecraft.client.input.PreeditEvent;
-// @target else
-// @target end
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Character;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Key;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Pointer;
+import com.kltyton.visual_creative_tab_editor.client.editor.input.EditorInput.Preedit;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
-// @target if minecraft_version=26.1.2,26.2
-//|import org.jetbrains.annotations.Nullable;
-// @target else
-// @target end
+import javax.annotation.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -64,22 +46,9 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         extends AbstractContainerScreen<CreativeModeInventoryScreen.ItemPickerMenu>
         implements CreativeTabEditorHost {
     @Unique
-// @target if minecraft_version=1.20.1,26.1.2,26.2
-// @target else
-    private static final float visualCreativeTabEditor$OVERLAY_Z = 500.0F;
-    @Unique
-// @target end
     private CreativeTabEditorController visualCreativeTabEditor$editor;
     @Unique
     private @Nullable EditBox visualCreativeTabEditor$titleEditor;
-// @target if minecraft_version=1.20.1
-//|    @Unique
-//|    private boolean visualCreativeTabEditor$loggedOverlayDepth;
-// @target elif minecraft_version=26.1.2,26.2
-// @target else
-    @Unique
-    private boolean visualCreativeTabEditor$renderLayerTraceLogged;
-// @target end
 
     protected CreativeModeInventoryScreenEditorMixin(
             CreativeModeInventoryScreen.ItemPickerMenu menu,
@@ -90,7 +59,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     }
 
     @Unique
-    private CreativeTabEditorController visualCreativeTabEditor$editor() {
+    public CreativeTabEditorController visualCreativeTabEditor$editor() {
         if (this.visualCreativeTabEditor$editor == null) {
             this.visualCreativeTabEditor$editor = new CreativeTabEditorController(this);
         }
@@ -110,189 +79,29 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         this.visualCreativeTabEditor$editor().onInit();
     }
 
-    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$mouseClicked(
-// @target if minecraft_version=26.1.2,26.2
-//|            MouseButtonEvent event,
-//|            boolean doubleClick,
-// @target else
-            double mouseX,
-            double mouseY,
-            int button,
-// @target end
-            CallbackInfoReturnable<Boolean> callback
-    ) {
-// @target if minecraft_version=26.1.2,26.2
-//|        if (this.visualCreativeTabEditor$editor().mouseClicked(event, doubleClick)) {
-// @target else
-        if (this.visualCreativeTabEditor$editor().mouseClicked(mouseX, mouseY, button)) {
-// @target end
-            callback.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "slotClicked", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$slotClicked(
-            @Nullable Slot slot,
-            int slotId,
-            int button,
-            ClickType input,
-            CallbackInfo callback
-    ) {
-        if (this.visualCreativeTabEditor$editor().slotClicked(slot, slotId, button, input)) {
-            callback.cancel();
-        }
-    }
-
-    @Inject(method = "mouseDragged", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$mouseDragged(
-// @target if minecraft_version=26.1.2,26.2
-//|            MouseButtonEvent event,
-// @target else
-            double mouseX,
-            double mouseY,
-            int button,
-// @target end
-            double deltaX,
-            double deltaY,
-            CallbackInfoReturnable<Boolean> callback
-    ) {
-// @target if minecraft_version=26.1.2,26.2
-//|        if (this.visualCreativeTabEditor$editor().mouseDragged(event, deltaX, deltaY)) {
-// @target else
-        if (this.visualCreativeTabEditor$editor().mouseDragged(mouseX, mouseY, button, deltaX, deltaY)) {
-// @target end
-            callback.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "mouseScrolled", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$mouseScrolled(
-            double mouseX,
-            double mouseY,
-// @target if minecraft_version=1.20.1
-//|            double delta,
-// @target else
-            double horizontal,
-            double vertical,
-// @target end
-            CallbackInfoReturnable<Boolean> callback
-    ) {
-// @target if minecraft_version=1.20.1
-//|        if (this.visualCreativeTabEditor$editor().mouseScrolled(mouseX, mouseY, delta)) {
-// @target else
-        if (this.visualCreativeTabEditor$editor().mouseScrolled(mouseX, mouseY, horizontal, vertical)) {
-// @target end
-            callback.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "mouseReleased", at = @At("HEAD"), cancellable = true)
-    private void visualCreativeTabEditor$mouseReleasedHead(
-// @target if minecraft_version=26.1.2,26.2
-//|            MouseButtonEvent event,
-// @target else
-            double mouseX,
-            double mouseY,
-            int button,
-// @target end
-            CallbackInfoReturnable<Boolean> callback
-    ) {
-// @target if minecraft_version=26.1.2,26.2
-//|        if (this.visualCreativeTabEditor$editor().mouseReleased(event)) {
-// @target else
-        if (this.visualCreativeTabEditor$editor().mouseReleased(mouseX, mouseY, button)) {
-// @target end
-            callback.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "mouseReleased", at = @At("RETURN"))
-    private void visualCreativeTabEditor$mouseReleasedReturn(
-// @target if minecraft_version=26.1.2,26.2
-//|            MouseButtonEvent event,
-// @target else
-            double mouseX,
-            double mouseY,
-            int button,
-// @target end
-            CallbackInfoReturnable<Boolean> callback
-    ) {
-// @target if minecraft_version=26.1.2,26.2
-//|        this.visualCreativeTabEditor$editor().afterMouseReleased(event);
-// @target else
-        this.visualCreativeTabEditor$editor().afterMouseReleased(mouseX, mouseY, button);
-// @target end
-    }
-
     @Override
-    public void visualCreativeTabEditor$renderItemGroupBackground(GuiGraphics graphics, Slot slot) {
+    public void visualCreativeTabEditor$renderItemGroupBackground(EditorGraphics graphics, Slot slot) {
         this.visualCreativeTabEditor$editor().renderItemGroupBackground(graphics, slot);
     }
 
     @Override
-    public void visualCreativeTabEditor$renderItemGroupBadge(GuiGraphics graphics, Slot slot) {
+    public void visualCreativeTabEditor$renderItemGroupBadge(EditorGraphics graphics, Slot slot) {
         this.visualCreativeTabEditor$editor().renderItemGroupBadge(graphics, slot);
     }
 
     @Override
+    public void visualCreativeTabEditor$renderCategoryFrame(EditorGraphics graphics) {
+        this.visualCreativeTabEditor$editor().renderCategoryFrame(graphics);
+    }
+
+    @Override
     public void visualCreativeTabEditor$renderEditorOverlay(
-            GuiGraphics graphics,
+            EditorGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick
     ) {
-// @target if minecraft_version=1.20.1
-//|        PoseStack pose = graphics.pose();
-//|        float baseZ = pose.last().pose().m32();
-//|        graphics.flush();
-//|        pose.pushPose();
-//|        pose.translate(0.0F, 0.0F, 500.0F);
-//|        if (!this.visualCreativeTabEditor$loggedOverlayDepth) {
-//|            this.visualCreativeTabEditor$loggedOverlayDepth = true;
-//|            VisualCreativeTabEditorConstants.LOGGER.debug(
-//|                    "[EditorTrace] overlay-depth baseZ={} overlayZ={} flush=true",
-//|                    baseZ,
-//|                    pose.last().pose().m32()
-//|            );
-//|        }
-//|        try {
-//|            this.visualCreativeTabEditor$editor().render(graphics, mouseX, mouseY, partialTick);
-//|        } finally {
-//|            graphics.flush();
-//|            pose.popPose();
-//|        }
-// @target elif minecraft_version=26.1.2,26.2
-//|        this.visualCreativeTabEditor$editor().extractRenderState(graphics, mouseX, mouseY, partialTick);
-// @target else
-        CreativeTabEditorController editor = this.visualCreativeTabEditor$editor();
-        if (!editor.prepareRender(mouseX, mouseY)) {
-            this.visualCreativeTabEditor$renderLayerTraceLogged = false;
-            return;
-        }
-
-        float basePoseZ = graphics.pose().last().pose().m32();
-        graphics.flush();
-        graphics.pose().pushPose();
-        try {
-            graphics.pose().translate(0.0F, 0.0F, visualCreativeTabEditor$OVERLAY_Z);
-            float overlayPoseZ = graphics.pose().last().pose().m32();
-            if (!this.visualCreativeTabEditor$renderLayerTraceLogged) {
-                VisualCreativeTabEditorConstants.LOGGER.debug(
-                        "[EditorTrace] render-layer-pass basePoseZ={} overlayPoseZ={} translation={} "
-                                + "vanillaTooltipZ=400 flushBefore=true flushAfter=true",
-                        basePoseZ,
-                        overlayPoseZ,
-                        visualCreativeTabEditor$OVERLAY_Z
-                );
-                this.visualCreativeTabEditor$renderLayerTraceLogged = true;
-            }
-            editor.renderOverlay(graphics, mouseX, mouseY, partialTick);
-            graphics.flush();
-        } finally {
-            graphics.pose().popPose();
-        }
-// @target end
+        this.visualCreativeTabEditor$editor().render(graphics, mouseX, mouseY, partialTick);
     }
 
     @Inject(method = "selectTab", at = @At("HEAD"), cancellable = true)
@@ -383,25 +192,9 @@ public abstract class CreativeModeInventoryScreenEditorMixin
                 : CreativeTabRuntime.id(tab).map(Object::toString).orElse("<unregistered>");
     }
 
-// @target if minecraft_version=26.1.2,26.2
-//|    @Inject(method = "extractBackground", at = @At("HEAD"))
-// @target else
-    @Inject(method = "renderBg", at = @At("HEAD"))
-// @target end
-    private void visualCreativeTabEditor$arrangeDataDrivenTabs(
-            GuiGraphics graphics,
-// @target if minecraft_version=26.1.2,26.2
-// @target else
-            float partialTick,
-// @target end
-            int mouseX,
-            int mouseY,
-// @target if minecraft_version=26.1.2,26.2
-//|            float partialTick,
-// @target else
-// @target end
-            CallbackInfo callback
-    ) {
+    @Override
+    @Unique
+    public void visualCreativeTabEditor$arrangeDataDrivenTabs() {
         if (CreativeTabRuntime.catalog().isEmpty() || CreativeTabClientPlatform.preservesNativeTabPositions()) {
             return;
         }
@@ -411,33 +204,6 @@ public abstract class CreativeModeInventoryScreenEditorMixin
             tab.row = index < 7 ? CreativeModeTab.Row.TOP : CreativeModeTab.Row.BOTTOM;
             tab.column = index % 7;
         }
-// @target if minecraft_version=1.20.1
-//|    }
-//|
-//|    @Redirect(
-//|            method = "renderBg",
-//|            at = @At(
-//|                    value = "INVOKE",
-//|                    target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lnet/minecraft/resources/ResourceLocation;IIIIII)V",
-//|                    ordinal = 0
-//|            )
-//|    )
-//|    private void visualCreativeTabEditor$renderDataDrivenBackground(
-//|            GuiGraphics graphics,
-//|            ResourceLocation nativeBackground,
-//|            int x,
-//|            int y,
-//|            int u,
-//|            int v,
-//|            int width,
-//|            int height
-//|    ) {
-//|        ResourceLocation background = CreativeTabRuntime.definition(this.visualCreativeTabEditor$selectedTab())
-//|                .map(definition -> definition.layout().background())
-//|                .orElse(nativeBackground);
-//|        graphics.blit(background, x, y, u, v, width, height);
-// @target else
-// @target end
     }
 
     @Inject(method = "getTabX", at = @At("HEAD"), cancellable = true)
@@ -470,83 +236,16 @@ public abstract class CreativeModeInventoryScreenEditorMixin
 
     @Unique
     private List<CreativeModeTab> visualCreativeTabEditor$orderedVisibleTabs() {
-        List<CreativeModeTab> visible = new ArrayList<>(
-                CreativeTabClientPlatform.visibleTabs((CreativeModeInventoryScreen) (Object) this)
-        );
-        if (CreativeTabRuntime.catalog().isEmpty()) {
-            return visible;
-        }
-        Map<CreativeModeTab, Integer> nativeOrder = new HashMap<>();
-        for (int index = 0; index < visible.size(); index++) {
-            nativeOrder.put(visible.get(index), index);
-        }
-        Map<net.minecraft.resources.ResourceLocation, Integer> configuredOrder = new HashMap<>();
-        var definitions = CreativeTabRuntime.catalog().orderedDefinitions();
-        for (int index = 0; index < definitions.size(); index++) {
-            configuredOrder.put(definitions.get(index).id(), index);
-        }
-        visible.sort(java.util.Comparator
-                .comparingInt((CreativeModeTab tab) -> CreativeTabRuntime.id(tab)
-                        .map(id -> configuredOrder.getOrDefault(id, Integer.MAX_VALUE))
-                        .orElse(Integer.MAX_VALUE))
-                .thenComparingInt(tab -> nativeOrder.getOrDefault(tab, Integer.MAX_VALUE)));
-        return visible;
+        return com.kltyton.visual_creative_tab_editor.runtime.CreativeTabOrdering.ordered(
+                CreativeTabClientPlatform.visibleTabs((CreativeModeInventoryScreen) (Object) this));
     }
 
     @Inject(method = "checkTabHovering", at = @At("HEAD"), cancellable = true)
     private void visualCreativeTabEditor$suppressTabTooltip(
-            GuiGraphics graphics,
-            CreativeModeTab tab,
-            int mouseX,
-            int mouseY,
             CallbackInfoReturnable<Boolean> callback
     ) {
         if (this.visualCreativeTabEditor$editor().suppressesTooltips()) {
             callback.setReturnValue(false);
-        }
-    }
-
-    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
-// @target if minecraft_version=26.1.2,26.2
-//|    private void visualCreativeTabEditor$keyPressed(KeyEvent event, CallbackInfoReturnable<Boolean> callback) {
-//|        if (this.visualCreativeTabEditor$editor().keyPressed(event)) {
-// @target else
-    private void visualCreativeTabEditor$keyPressed(
-            int keyCode,
-            int scanCode,
-            int modifiers,
-            CallbackInfoReturnable<Boolean> callback
-    ) {
-        if (this.visualCreativeTabEditor$editor().keyPressed(keyCode, scanCode, modifiers)) {
-// @target end
-            callback.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "charTyped", at = @At("HEAD"), cancellable = true)
-// @target if minecraft_version=26.1.2,26.2
-//|    private void visualCreativeTabEditor$charTyped(CharacterEvent event, CallbackInfoReturnable<Boolean> callback) {
-//|        if (this.visualCreativeTabEditor$editor().charTyped(event)) {
-//|            callback.setReturnValue(true);
-//|        }
-//|    }
-//|
-//|    @Inject(method = "preeditUpdated", at = @At("HEAD"), cancellable = true)
-//|    private void visualCreativeTabEditor$preeditUpdated(
-//|            @Nullable PreeditEvent event,
-// @target else
-    private void visualCreativeTabEditor$charTyped(
-            char codePoint,
-            int modifiers,
-// @target end
-            CallbackInfoReturnable<Boolean> callback
-    ) {
-// @target if minecraft_version=26.1.2,26.2
-//|        if (this.visualCreativeTabEditor$editor().preeditUpdated(event)) {
-// @target else
-        if (this.visualCreativeTabEditor$editor().charTyped(codePoint, modifiers)) {
-// @target end
-            callback.setReturnValue(true);
         }
     }
 
@@ -713,11 +412,7 @@ public abstract class CreativeModeInventoryScreenEditorMixin
                 20,
                 Component.translatable("visual_creative_tab_editor.editor.title")
         );
-// @target if minecraft_version=26.1.2,26.2
-//|        editor.setTextShadow(false);
-// @target else
         com.kltyton.visual_creative_tab_editor.client.CreativeTabTextInput.disableShadow(editor);
-// @target end
         editor.setMaxLength(128);
         editor.setValue(value);
         this.visualCreativeTabEditor$titleEditor = this.addWidget(editor);
@@ -738,97 +433,58 @@ public abstract class CreativeModeInventoryScreenEditorMixin
     }
 
     @Override
-// @target if minecraft_version=26.1.2,26.2
-//|    public void visualCreativeTabEditor$extractTitleEditor(
-// @target else
     public void visualCreativeTabEditor$renderTitleEditor(
-// @target end
-            GuiGraphics graphics,
+            EditorGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick
     ) {
         if (this.visualCreativeTabEditor$titleEditor != null && this.visualCreativeTabEditor$titleEditor.visible) {
-// @target if minecraft_version=26.1.2,26.2
-//|            this.visualCreativeTabEditor$titleEditor.extractRenderState(graphics, mouseX, mouseY, partialTick);
-// @target else
-            this.visualCreativeTabEditor$titleEditor.render(graphics, mouseX, mouseY, partialTick);
-// @target end
+            EditBox editor = this.visualCreativeTabEditor$titleEditor;
+            EditorTheme.inset(graphics, editor.getX() - 1, editor.getY() - 1,
+                    editor.getWidth() + 2, editor.getHeight() + 2, editor.isFocused());
+            graphics.title(this.visualCreativeTabEditor$titleEditor, mouseX, mouseY, partialTick);
         }
     }
 
     @Override
-// @target if minecraft_version=26.1.2,26.2
-//|    public boolean visualCreativeTabEditor$titleEditorKeyPressed(KeyEvent event) {
-// @target else
-    public boolean visualCreativeTabEditor$titleEditorKeyPressed(int keyCode, int scanCode, int modifiers) {
-// @target end
+    public boolean visualCreativeTabEditor$titleEditorKeyPressed(Key event) {
         return this.visualCreativeTabEditor$titleEditor != null
-// @target if minecraft_version=26.1.2,26.2
-//|                && this.visualCreativeTabEditor$titleEditor.keyPressed(event);
-// @target else
-                && this.visualCreativeTabEditor$titleEditor.keyPressed(keyCode, scanCode, modifiers);
-// @target end
+                && event.press(this.visualCreativeTabEditor$titleEditor);
     }
 
     @Override
-// @target if minecraft_version=26.1.2,26.2
-//|    public boolean visualCreativeTabEditor$titleEditorCharTyped(CharacterEvent event) {
-// @target else
-    public boolean visualCreativeTabEditor$titleEditorCharTyped(char codePoint, int modifiers) {
-// @target end
+    public boolean visualCreativeTabEditor$titleEditorCharTyped(Character event) {
         return this.visualCreativeTabEditor$titleEditor != null
-// @target if minecraft_version=26.1.2,26.2
-//|                && this.visualCreativeTabEditor$titleEditor.charTyped(event);
-//|    }
-//|
-//|    @Override
-//|    public boolean visualCreativeTabEditor$titleEditorPreeditUpdated(@Nullable PreeditEvent event) {
-//|        return this.visualCreativeTabEditor$titleEditor != null
-//|                && this.visualCreativeTabEditor$titleEditor.preeditUpdated(event);
-// @target else
-                && this.visualCreativeTabEditor$titleEditor.charTyped(codePoint, modifiers);
-// @target end
+                && event.type(this.visualCreativeTabEditor$titleEditor);
+    }
+
+    @Override
+    public boolean visualCreativeTabEditor$titleEditorPreeditUpdated(@Nullable Preedit event) {
+        return this.visualCreativeTabEditor$titleEditor != null
+                && event.update(this.visualCreativeTabEditor$titleEditor);
     }
 
     @Override
     public boolean visualCreativeTabEditor$titleEditorMouseDragged(
-// @target if minecraft_version=26.1.2,26.2
-//|            MouseButtonEvent event,
-// @target else
-            double mouseX,
-            double mouseY,
-            int button,
-// @target end
+            Pointer event,
             double deltaX,
             double deltaY
     ) {
         return this.visualCreativeTabEditor$titleEditor != null
                 && this.isDragging()
                 && this.getFocused() == this.visualCreativeTabEditor$titleEditor
-// @target if minecraft_version=26.1.2,26.2
-//|                && this.visualCreativeTabEditor$titleEditor.mouseDragged(event, deltaX, deltaY);
-// @target else
-                && this.visualCreativeTabEditor$titleEditor.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
-// @target end
+                && event.drag(this.visualCreativeTabEditor$titleEditor, deltaX, deltaY);
     }
 
     @Override
-// @target if minecraft_version=26.1.2,26.2
-//|    public boolean visualCreativeTabEditor$titleEditorMouseReleased(MouseButtonEvent event) {
-// @target else
-    public boolean visualCreativeTabEditor$titleEditorMouseReleased(double mouseX, double mouseY, int button) {
-// @target end
+    public boolean visualCreativeTabEditor$titleEditorMouseReleased(Pointer event) {
         boolean titleWasDragging = this.isDragging()
                 && this.getFocused() == this.visualCreativeTabEditor$titleEditor;
         this.setDragging(false);
         return titleWasDragging
                 && this.visualCreativeTabEditor$titleEditor != null
-// @target if minecraft_version=26.1.2,26.2
-//|                && this.visualCreativeTabEditor$titleEditor.mouseReleased(event);
-// @target else
-                && this.visualCreativeTabEditor$titleEditor.mouseReleased(mouseX, mouseY, button);
-// @target end
+                && event.release(this.visualCreativeTabEditor$titleEditor);
     }
 
     @Override
@@ -844,11 +500,6 @@ public abstract class CreativeModeInventoryScreenEditorMixin
         }
         this.removeWidget(editor);
         this.visualCreativeTabEditor$titleEditor = null;
-    }
-
-    @Override
-    public void visualCreativeTabEditor$replaySlotClick(Slot slot, int slotId, int button, ClickType input) {
-        this.slotClicked(slot, slotId, button, input);
     }
 
     @Override

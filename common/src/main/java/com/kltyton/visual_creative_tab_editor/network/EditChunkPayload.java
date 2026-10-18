@@ -4,14 +4,8 @@ import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import io.netty.handler.codec.DecoderException;
 import java.util.Objects;
 import java.util.UUID;
-// @target if minecraft_version=1.20.1
-//|import net.minecraft.network.FriendlyByteBuf;
-// @target else
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-// @target end
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.FriendlyByteBuf;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 
 /** One bounded chunk of a client edit transaction. */
 public record EditChunkPayload(
@@ -20,19 +14,9 @@ public record EditChunkPayload(
         int index,
         int total,
         byte[] chunk
-// @target if minecraft_version=1.20.1
-//|) implements CreativeTabPayload {
-//|    public static final ResourceLocation ID =
-//|            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "edit_chunk_v3");
-// @target else
-) implements CustomPacketPayload {
-    public static final Type<EditChunkPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_chunk_v3")
-    );
-
-    public static final StreamCodec<RegistryFriendlyByteBuf, EditChunkPayload> STREAM_CODEC =
-            CustomPacketPayload.codec(EditChunkPayload::write, EditChunkPayload::decode);
-// @target end
+) implements CreativeTabPayload {
+    public static final ResourceId ID =
+            ResourceId.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_chunk_v4");
 
     public EditChunkPayload {
         Objects.requireNonNull(sessionId, "sessionId");
@@ -49,21 +33,12 @@ public record EditChunkPayload(
     }
 
     @Override
-// @target if minecraft_version=1.20.1
-//|    public ResourceLocation id() {
-//|        return ID;
-// @target else
-    public Type<EditChunkPayload> type() {
-        return TYPE;
-// @target end
+    public ResourceId payloadId() {
+        return ID;
     }
 
-// @target if minecraft_version=1.20.1
-//|    @Override
-//|    public void write(FriendlyByteBuf buffer) {
-// @target else
-    private void write(RegistryFriendlyByteBuf buffer) {
-// @target end
+    @Override
+    public void write(FriendlyByteBuf buffer) {
         buffer.writeUUID(sessionId);
         buffer.writeVarLong(baseRevision);
         buffer.writeVarInt(index);
@@ -71,11 +46,7 @@ public record EditChunkPayload(
         buffer.writeByteArray(chunk);
     }
 
-// @target if minecraft_version=1.20.1
-//|    public static EditChunkPayload decode(FriendlyByteBuf buffer) {
-// @target else
-    private static EditChunkPayload decode(RegistryFriendlyByteBuf buffer) {
-// @target end
+    public static EditChunkPayload decode(FriendlyByteBuf buffer) {
         try {
             return new EditChunkPayload(
                     buffer.readUUID(),

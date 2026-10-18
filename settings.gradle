@@ -15,19 +15,9 @@ wrapperRoots.each { directory ->
 }
 def targets = file('targets').listFiles()?.findAll { it.isDirectory() }?.sort { it.name } ?: []
 if (targets.empty) { throw new GradleException('No target directories found') }
-def active = file('.temple/active-target')
-def selected = active.exists() ? active.getText('UTF-8').trim() : identity.getProperty('temple_default_target')
-def target = targets.find { it.name == selected } ?: targets.first()
 def packageName = identity.getProperty('mod_java_package', identity.getProperty('mod_group_id'))
 if (!(packageName ==~ /[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+/) ||
         !(identity.getProperty('mod_id', '') ==~ /[a-z][a-z0-9_]{1,63}/)) {
     throw new GradleException('Invalid mod identity')
-}
-targets.each { directory ->
-def constants = new File(directory, "build/generated/sources/temple/${packageName.replace('.', '/')}/BuildInfo.java")
-constants.parentFile.mkdirs()
-constants.setText("package ${packageName};\n\npublic final class BuildInfo {\n" +
-        "    public static final String MOD_ID = \"${identity.getProperty('mod_id')}\";\n" +
-        "    private BuildInfo() {}\n}\n", 'UTF-8')
 }
 // Targets are linked as independent IDEA Gradle projects, each with its own Wrapper.

@@ -2,14 +2,8 @@ package com.kltyton.visual_creative_tab_editor.network;
 
 import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import io.netty.handler.codec.DecoderException;
-// @target if minecraft_version=1.20.1
-//|import net.minecraft.network.FriendlyByteBuf;
-// @target else
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-// @target end
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.FriendlyByteBuf;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 
 /** One bounded chunk of a server-authoritative creative-tab snapshot. */
 public record SnapshotChunkPayload(
@@ -19,19 +13,9 @@ public record SnapshotChunkPayload(
         int total,
         int uncompressedSize,
         byte[] chunk
-// @target if minecraft_version=1.20.1
-//|) implements CreativeTabPayload {
-//|    public static final ResourceLocation ID =
-//|            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "snapshot_chunk_v3");
-// @target else
-) implements CustomPacketPayload {
-    public static final Type<SnapshotChunkPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "snapshot_chunk_v3")
-    );
-
-    public static final StreamCodec<RegistryFriendlyByteBuf, SnapshotChunkPayload> STREAM_CODEC =
-            CustomPacketPayload.codec(SnapshotChunkPayload::write, SnapshotChunkPayload::decode);
-// @target end
+) implements CreativeTabPayload {
+    public static final ResourceId ID =
+            ResourceId.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "snapshot_chunk_v4");
 
     public SnapshotChunkPayload {
         if (revision < 0) {
@@ -48,21 +32,12 @@ public record SnapshotChunkPayload(
     }
 
     @Override
-// @target if minecraft_version=1.20.1
-//|    public ResourceLocation id() {
-//|        return ID;
-// @target else
-    public Type<SnapshotChunkPayload> type() {
-        return TYPE;
-// @target end
+    public ResourceId payloadId() {
+        return ID;
     }
 
-// @target if minecraft_version=1.20.1
-//|    @Override
-//|    public void write(FriendlyByteBuf buffer) {
-// @target else
-    private void write(RegistryFriendlyByteBuf buffer) {
-// @target end
+    @Override
+    public void write(FriendlyByteBuf buffer) {
         buffer.writeVarLong(revision);
         buffer.writeBoolean(canEdit);
         buffer.writeVarInt(index);
@@ -71,11 +46,7 @@ public record SnapshotChunkPayload(
         buffer.writeByteArray(chunk);
     }
 
-// @target if minecraft_version=1.20.1
-//|    public static SnapshotChunkPayload decode(FriendlyByteBuf buffer) {
-// @target else
-    private static SnapshotChunkPayload decode(RegistryFriendlyByteBuf buffer) {
-// @target end
+    public static SnapshotChunkPayload decode(FriendlyByteBuf buffer) {
         try {
             return new SnapshotChunkPayload(
                     buffer.readVarLong(),

@@ -8,7 +8,7 @@ import java.util.stream.Stream;
 
 public final class TargetPlan {
     public static final List<String> BLUEPRINTS = List.of("fabric-1.20.1", "fabric-1.21.1", "fabric-26.1.2",
-            "forge-1.18.2", "forge-1.19.2", "forge-1.20.1", "neoforge-1.21.1", "neoforge-26.1.2", "neoforge-26.2.0");
+            "forge-1.18.2", "forge-1.19.2", "forge-1.20.1", "neoforge-1.21.1", "neoforge-26.1.2", "neoforge-26.2");
 
     public static String blueprint(String loader, String minecraft, int javaVersion) {
         String exact = loader + "-" + minecraft;
@@ -56,7 +56,7 @@ public final class TargetPlan {
             if (!from.equals(to) && Files.exists(to)) throw new IllegalArgumentException("Target already exists: " + id);
             Properties properties = read(from.resolve("gradle.properties"));
             Properties wrapper = read(from.resolve("gradle/wrapper/gradle-wrapper.properties"));
-            if (!loader.equals(properties.getProperty("loader")) || properties.getProperty("shared_sources") == null)
+            if (!loader.equals(properties.getProperty("loader")))
                 throw new IllegalArgumentException("Invalid blueprint: " + source);
             try (Stream<Path> paths = Files.walk(from)) {
                 if (paths.anyMatch(Files::isSymbolicLink)) throw new IllegalArgumentException("Blueprint contains symbolic links: " + source);
@@ -97,14 +97,12 @@ public final class TargetPlan {
             String loader = row.get("loader"), mc = row.get("minecraft_version");
             Path to = plan.to();
             Properties properties = plan.properties(), wrapper = plan.wrapper();
-            String oldMc = properties.getProperty("minecraft_version");
             row.forEach((key, value) -> {
                 if (!key.equals("blueprint")) properties.setProperty(key, value);
             });
             properties.setProperty("minecraft_version_range", "[" + mc + "]");
             properties.setProperty("loader_version_range", loader.equals("fabric") ? ">=" + row.get("loader_version") :
                     "[" + row.get("loader_version") + ",)");
-            properties.setProperty("shared_sources", properties.getProperty("shared_sources").replace(oldMc, mc));
             if (loader.equals("forge"))
                 properties.setProperty("fml_version_range", "[" + row.get("loader_version").split("\\.")[0] + ",)");
             if (loader.equals("neoforge") && mc.equals("1.20.6")) properties.setProperty("fml_version_range", "[3,)");
@@ -117,8 +115,10 @@ public final class TargetPlan {
                 write(to.resolve("gradle/wrapper/gradle-wrapper.properties"), wrapper);
             }
             if (row.containsKey("forgegradle_version") && BuildScripts.dsl(root) == BuildScripts.Dsl.GROOVY) {
-                Files.writeString(to.resolve("build.gradle"), "plugins {\n    id 'net.minecraftforge.gradle' version \"${forgegradle_version}\"\n" +
+                Files.writeString(to.resolve("build.gradle"), "plugins {\n    id 'java-library'\n    id 'maven-publish'\n    id 'org.spongepowered.mixin' version '0.7-SNAPSHOT'\n    id 'net.minecraftforge.gradle' version \"${forgegradle_version}\"\n" +
                         "    id 'me.modmuss50.mod-publish-plugin' version \"${publish_plugin_version}\"\n}\n" +
+                        "ext.templeMixinPluginVersion = org.spongepowered.asm.gradle.plugins.MixinGradlePlugin.VERSION\n" +
+                        "ext.templeForgeRunTaskType = net.minecraftforge.gradle.common.util.runs.MinecraftRunTask.class\n" +
                         "apply from: file('../../gradle/target-conventions/forgegradle.gradle')\n");
             }
             BuildScripts.prepareTarget(root, to);

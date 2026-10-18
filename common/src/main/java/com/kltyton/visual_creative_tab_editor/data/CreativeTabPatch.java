@@ -1,8 +1,9 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
 import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping;
+import com.kltyton.visual_creative_tab_editor.data.category.CreativeTabCategories;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
@@ -23,8 +24,9 @@ public record CreativeTabPatch(
         Optional<Boolean> canScroll,
         Optional<Boolean> showTitle,
         Optional<Boolean> alignedRight,
-        Optional<ResourceLocation> background,
-        Optional<CreativeItemGrouping> grouping
+        Optional<ResourceId> background,
+        Optional<CreativeItemGrouping> grouping,
+        Optional<CreativeTabCategories> categories
 ) {
     /** Current JSON schema version. */
     public static final int CURRENT_FORMAT = 1;
@@ -42,13 +44,23 @@ public record CreativeTabPatch(
         alignedRight = requireOptional(alignedRight, "alignedRight");
         background = requireOptional(background, "background");
         grouping = requireOptional(grouping, "grouping");
+        categories = requireOptional(categories, "categories");
         CreativeTabValidation.validatePatchFields(format, title, icon, items, searchItems, order);
     }
 
     public CreativeTabPatch(int format, Optional<Component> title, Optional<ItemStack> icon,
             Optional<List<ItemStack>> items, Optional<List<ItemStack>> searchItems, Optional<Boolean> hidden,
             Optional<Integer> order, Optional<CreativeTabType> type, Optional<Boolean> canScroll,
-            Optional<Boolean> showTitle, Optional<Boolean> alignedRight, Optional<ResourceLocation> background) {
+            Optional<Boolean> showTitle, Optional<Boolean> alignedRight, Optional<ResourceId> background,
+            Optional<CreativeItemGrouping> grouping) {
+        this(format, title, icon, items, searchItems, hidden, order, type, canScroll, showTitle,
+                alignedRight, background, grouping, Optional.empty());
+    }
+
+    public CreativeTabPatch(int format, Optional<Component> title, Optional<ItemStack> icon,
+            Optional<List<ItemStack>> items, Optional<List<ItemStack>> searchItems, Optional<Boolean> hidden,
+            Optional<Integer> order, Optional<CreativeTabType> type, Optional<Boolean> canScroll,
+            Optional<Boolean> showTitle, Optional<Boolean> alignedRight, Optional<ResourceId> background) {
         this(format, title, icon, items, searchItems, hidden, order, type, canScroll, showTitle,
                 alignedRight, background, Optional.empty());
     }
@@ -65,7 +77,7 @@ public record CreativeTabPatch(
             Optional<Boolean> canScroll,
             Optional<Boolean> showTitle,
             Optional<Boolean> alignedRight,
-            Optional<ResourceLocation> background
+            Optional<ResourceId> background
     ) {
         this(format, title, icon, items, Optional.empty(), hidden, order, type,
                 canScroll, showTitle, alignedRight, background);
@@ -106,7 +118,8 @@ public record CreativeTabPatch(
                 Optional.of(layout.showTitle()),
                 Optional.of(layout.alignedRight()),
                 Optional.of(layout.background()),
-                Optional.of(definition.grouping())
+                Optional.of(definition.grouping()),
+                Optional.of(definition.categories())
         );
     }
 
@@ -135,7 +148,8 @@ public record CreativeTabPatch(
                 changed(baseLayout.showTitle(), targetLayout.showTitle()),
                 changed(baseLayout.alignedRight(), targetLayout.alignedRight()),
                 changed(baseLayout.background(), targetLayout.background()),
-                base.grouping().sameContents(target.grouping()) ? Optional.empty() : Optional.of(target.grouping())
+                base.grouping().sameContents(target.grouping()) ? Optional.empty() : Optional.of(target.grouping()),
+                base.categories().sameContents(target.categories()) ? Optional.empty() : Optional.of(target.categories())
         );
     }
 
@@ -168,7 +182,8 @@ public record CreativeTabPatch(
                 higher.showTitle.isPresent() ? higher.showTitle : showTitle,
                 higher.alignedRight.isPresent() ? higher.alignedRight : alignedRight,
                 higher.background.isPresent() ? higher.background : background,
-                higher.grouping.isPresent() ? higher.grouping : grouping
+                higher.grouping.isPresent() ? higher.grouping : grouping,
+                higher.categories.isPresent() ? higher.categories : categories
         );
     }
 
@@ -185,7 +200,8 @@ public record CreativeTabPatch(
                 && showTitle.isEmpty()
                 && alignedRight.isEmpty()
                 && background.isEmpty()
-                && grouping.isEmpty();
+                && grouping.isEmpty()
+                && categories.isEmpty();
     }
 
     @Override

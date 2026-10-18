@@ -1,8 +1,10 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
+import com.kltyton.visual_creative_tab_editor.platform.item.StackData;
 import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping;
+import com.kltyton.visual_creative_tab_editor.data.category.CreativeTabCategories;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -16,7 +18,7 @@ import java.util.Objects;
  * sequence; {@code searchItems} is the sequence contributed to global search.
  */
 public record CreativeTabDefinition(
-        ResourceLocation id,
+        ResourceId id,
         int format,
         Component title,
         ItemStack icon,
@@ -26,7 +28,8 @@ public record CreativeTabDefinition(
         int order,
         CreativeTabType type,
         CreativeTabLayout layout,
-        CreativeItemGrouping grouping
+        CreativeItemGrouping grouping,
+        CreativeTabCategories categories
 ) {
     public CreativeTabDefinition {
         Objects.requireNonNull(id, "id");
@@ -37,13 +40,24 @@ public record CreativeTabDefinition(
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(layout, "layout");
         Objects.requireNonNull(grouping, "grouping");
+        Objects.requireNonNull(categories, "categories");
+        if (type != CreativeTabType.CATEGORY && !categories.isEmpty()) {
+            throw new IllegalArgumentException("Only category creative tabs can contain subcategories");
+        }
         if (type != CreativeTabType.CATEGORY && type != CreativeTabType.SEARCH && !grouping.isEmpty()) {
             throw new IllegalArgumentException("System inventory and hotbar tabs cannot contain item groups");
         }
         CreativeTabValidation.validateDefinitionFields(format, title, icon, items, searchItems, order, type);
     }
 
-    public CreativeTabDefinition(ResourceLocation id, int format, Component title, ItemStack icon,
+    public CreativeTabDefinition(ResourceId id, int format, Component title, ItemStack icon,
+            List<ItemStack> items, List<ItemStack> searchItems, boolean hidden, int order,
+            CreativeTabType type, CreativeTabLayout layout, CreativeItemGrouping grouping) {
+        this(id, format, title, icon, items, searchItems, hidden, order, type, layout, grouping,
+                CreativeTabCategories.EMPTY);
+    }
+
+    public CreativeTabDefinition(ResourceId id, int format, Component title, ItemStack icon,
             List<ItemStack> items, List<ItemStack> searchItems, boolean hidden, int order,
             CreativeTabType type, CreativeTabLayout layout) {
         this(id, format, title, icon, items, searchItems, hidden, order, type, layout, CreativeItemGrouping.EMPTY);
@@ -54,7 +68,7 @@ public record CreativeTabDefinition(
      * as visible in search. Both lists are still copied independently.
      */
     public CreativeTabDefinition(
-            ResourceLocation id,
+            ResourceId id,
             int format,
             Component title,
             ItemStack icon,
@@ -70,7 +84,7 @@ public record CreativeTabDefinition(
     }
 
     /** Creates a safe category baseline for a new identifier. */
-    public static CreativeTabDefinition defaults(ResourceLocation id) {
+    public static CreativeTabDefinition defaults(ResourceId id) {
         Objects.requireNonNull(id, "id");
         return new CreativeTabDefinition(
                 id,
@@ -87,7 +101,7 @@ public record CreativeTabDefinition(
     }
 
     /** Resolves low-to-high patches against the safe default baseline. */
-    public static CreativeTabDefinition resolve(ResourceLocation id, Iterable<CreativeTabPatch> lowToHigh) {
+    public static CreativeTabDefinition resolve(ResourceId id, Iterable<CreativeTabPatch> lowToHigh) {
         return defaults(id).apply(CreativeTabPatch.merge(lowToHigh));
     }
 
@@ -108,7 +122,8 @@ public record CreativeTabDefinition(
                 patch.order().orElse(order),
                 patch.type().orElse(type),
                 layout.apply(patch),
-                patch.grouping().orElse(grouping)
+                patch.grouping().orElse(grouping),
+                patch.categories().orElse(categories)
         );
     }
 
@@ -119,7 +134,12 @@ public record CreativeTabDefinition(
 
     public CreativeTabDefinition withGrouping(CreativeItemGrouping grouping) {
         return new CreativeTabDefinition(id, format, title, icon, items, searchItems, hidden, order,
-                type, layout, grouping);
+                type, layout, grouping, categories);
+    }
+
+    public CreativeTabDefinition withCategories(CreativeTabCategories categories) {
+        return new CreativeTabDefinition(id, format, title, icon, items, searchItems, hidden, order,
+                type, layout, grouping, categories);
     }
 
     @Override
@@ -149,11 +169,7 @@ public record CreativeTabDefinition(
 
     /** Compares one parent-tab stack without exposing or copying the stored stack. */
     public boolean itemMatches(int index, ItemStack other) {
-// @target if minecraft_version=1.20.1
-//|        return ItemStack.isSameItemSameTags(items.get(index), Objects.requireNonNull(other, "other"));
-// @target else
-        return ItemStack.isSameItemSameComponents(items.get(index), Objects.requireNonNull(other, "other"));
-// @target end
+        return StackData.same(items.get(index), Objects.requireNonNull(other, "other"));
     }
 
     /** Appends defensive count-one copies without allocating an intermediate list. */
@@ -202,11 +218,7 @@ public record CreativeTabDefinition(
             return false;
         }
         for (int index = 0; index < left.size(); index++) {
-// @target if minecraft_version=1.20.1
-//|            if (!ItemStack.isSameItemSameTags(left.get(index), right.get(index))) {
-// @target else
-            if (!ItemStack.isSameItemSameComponents(left.get(index), right.get(index))) {
-// @target end
+            if (!StackData.same(left.get(index), right.get(index))) {
                 return false;
             }
         }

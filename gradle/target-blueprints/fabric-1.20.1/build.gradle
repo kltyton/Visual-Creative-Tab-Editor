@@ -12,4 +12,6 @@ buildscript {
 apply plugin: 'fabric-loom'
 apply plugin: 'java'
 apply plugin: 'me.modmuss50.mod-publish-plugin'
+ext.templeMixinMappingServiceType = net.fabricmc.loom.task.service.MixinAPMappingService.TYPE
+ext.templeTinyRemapperServiceClass = net.fabricmc.loom.task.service.TinyRemapperService.class
 apply from: file('../../gradle/target-conventions/fabric.gradle')

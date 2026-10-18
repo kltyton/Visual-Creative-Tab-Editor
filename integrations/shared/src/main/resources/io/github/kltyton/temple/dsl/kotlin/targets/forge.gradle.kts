@@ -21,6 +21,16 @@ extensions.configure<LegacyForgeExtension> {
                     *(project.extra["templeDatagenExistingArgs"] as Array<String>))
         }
     }
-    mods.create(mod_id) { sourceSet(sourceSets.main.get()) }
+    mods.create(mod_id) {
+        sourceSet(sourceSets.main.get())
+        sourceSet(project(":common").extensions.getByType<SourceSetContainer>().named("main").get())
+    }
 }
 apply(from = file("../../gradle/target-conventions/publish.gradle.kts"))
+
+dependencies { add("annotationProcessor", "org.spongepowered:mixin:0.8.5-SNAPSHOT:processor") }
+extensions.configure<net.neoforged.moddevgradle.legacyforge.dsl.MixinExtension> {
+    config("$mod_id.mixins.json")
+    config("$mod_id.forge.mixins.json")
+}
+apply(from = file("../../gradle/target-conventions/forge-common-mixin.gradle"))

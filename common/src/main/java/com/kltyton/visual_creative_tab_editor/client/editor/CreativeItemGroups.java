@@ -1,11 +1,13 @@
 package com.kltyton.visual_creative_tab_editor.client.editor;
 
 import com.kltyton.visual_creative_tab_editor.client.config.CreativeTabClientConfig;
+import com.kltyton.visual_creative_tab_editor.client.editor.category.CreativeCategoryFilter;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabDefinition;
 import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGroup;
 import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping;
 import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping.ItemKey;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -26,6 +28,8 @@ import net.minecraft.world.level.block.StairBlock;
 /** Projects creative items into expandable groups without changing the tab's item list. */
 public final class CreativeItemGroups {
     private final Map<CreativeModeTab, Set<Object>> expandedTabs = new IdentityHashMap<>();
+    private final Map<CreativeModeTab, CreativeCategoryFilter> categoryFilters = new IdentityHashMap<>();
+    private CreativeCategoryFilter categoryFilter = new CreativeCategoryFilter();
     private final List<Entry> entries = new ArrayList<>();
     private final Map<Object, List<Integer>> members = new HashMap<>();
     private Set<Object> expanded = new HashSet<>();
@@ -50,10 +54,13 @@ public final class CreativeItemGroups {
         this.enabled = CreativeTabClientConfig.groupSimilarItems()
                 && (tab.getType() == CreativeModeTab.Type.CATEGORY || tab.getType() == CreativeModeTab.Type.SEARCH);
         this.expanded = this.expandedTabs.computeIfAbsent(tab, ignored -> new HashSet<>());
+        this.categoryFilter = this.categoryFilters.computeIfAbsent(tab, ignored -> new CreativeCategoryFilter());
         invalidate();
     }
 
     public CreativeModeTab tab() { return this.tab; }
+
+    public CreativeCategoryFilter categoryFilter() { return this.categoryFilter; }
 
     public void setGrouping(CreativeItemGrouping grouping) {
         if (this.grouping != grouping) {
@@ -75,6 +82,11 @@ public final class CreativeItemGroups {
     }
 
     public void refresh(List<ItemStack> items) {
+        if (this.tab != null) {
+            boolean configured = CreativeTabClientConfig.groupSimilarItems()
+                    && (this.tab.getType() == CreativeModeTab.Type.CATEGORY || this.tab.getType() == CreativeModeTab.Type.SEARCH);
+            if (configured != this.enabled) { this.enabled = configured; invalidate(); }
+        }
         if (!this.dirty) {
             return;
         }
@@ -86,8 +98,9 @@ public final class CreativeItemGroups {
         this.ungrouped.clear();
         this.definitions.clear();
         this.displayIndices = new int[items.size()];
+        Arrays.fill(this.displayIndices, -1);
         prepareReservedRows(items);
-        this.projected = this.enabled || !this.reservedRowSources.isEmpty();
+        this.projected = this.enabled || this.categoryFilter.active() || !this.reservedRowSources.isEmpty();
         if (!this.projected) {
             return;
         }
@@ -99,7 +112,10 @@ public final class CreativeItemGroups {
         }
         this.ungrouped.addAll(CreativeItemGrouping.keys(this.grouping.ungrouped()));
         Object[] keys = new Object[items.size()];
+        boolean[] included = new boolean[items.size()];
         for (int index = 0; index < items.size(); index++) {
+            included[index] = this.categoryFilter.includes(items.get(index));
+            if (!included[index]) { continue; }
             Object key = family(items.get(index), this.sourceSections[index]);
             keys[index] = key;
             this.members.computeIfAbsent(key, ignored -> new ArrayList<>()).add(index);
@@ -108,6 +124,10 @@ public final class CreativeItemGroups {
         for (int index = 0; index < items.size(); index++) {
             Integer reservedEnd = this.reservedRuns.get(index);
             if (reservedEnd != null) {
+                if (this.categoryFilter.active() && !hasIncludedSection(included, reservedEnd)) {
+                    index = reservedEnd - 1;
+                    continue;
+                }
                 int headerStart = reservedEnd - ((reservedEnd - index) / 9) * 9;
                 for (int padding = index; padding < headerStart; padding++) {
                     this.displayIndices[padding] = this.entries.size();
@@ -122,6 +142,7 @@ public final class CreativeItemGroups {
                 index = reservedEnd - 1;
                 continue;
             }
+            if (!included[index]) { continue; }
             Object key = keys[index];
             List<Integer> group = this.members.get(key);
             if (!isGroup(key)) {
@@ -138,6 +159,13 @@ public final class CreativeItemGroups {
                 }
             }
         }
+    }
+
+    private boolean hasIncludedSection(boolean[] included, int start) {
+        for (int index = start; index < included.length && !this.reservedRuns.containsKey(index); index++) {
+            if (included[index]) { return true; }
+        }
+        return false;
     }
 
     public boolean enabled() {
@@ -248,6 +276,11 @@ public final class CreativeItemGroups {
     }
 
     public int reveal(int sourceIndex, List<ItemStack> items) {
+        if (!this.categoryFilter.includes(items.get(sourceIndex))) {
+            this.categoryFilter.showAll();
+            invalidate();
+            refresh(items);
+        }
         Object key = family(items.get(sourceIndex), this.sourceSections[sourceIndex]);
         if (this.enabled && isGroup(key) && this.expanded.add(key)) {
             invalidate();
@@ -282,7 +315,8 @@ public final class CreativeItemGroups {
         if (ordinal == null || ordinal < 0 || ordinal >= this.reservedRowSources.size()) {
             return null;
         }
-        return displayIndex(this.reservedRowSources.get(ordinal)) / 9;
+        int projectedIndex = displayIndex(this.reservedRowSources.get(ordinal));
+        return projectedIndex < 0 ? null : projectedIndex / 9;
     }
 
     private void prepareReservedRows(List<ItemStack> items) {

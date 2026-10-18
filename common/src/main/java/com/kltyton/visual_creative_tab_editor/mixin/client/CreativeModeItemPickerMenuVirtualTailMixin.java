@@ -2,15 +2,18 @@ package com.kltyton.visual_creative_tab_editor.mixin.client;
 
 import com.kltyton.visual_creative_tab_editor.client.editor.CreativeModeItemPickerMenuVirtualTail;
 import com.kltyton.visual_creative_tab_editor.client.editor.CreativeItemGroups;
+import com.kltyton.visual_creative_tab_editor.client.editor.inventory.CreativeMenuItemList;
 import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabDefinition;
 import com.kltyton.visual_creative_tab_editor.data.itemgroup.CreativeItemGrouping;
+import com.kltyton.visual_creative_tab_editor.data.category.CreativeTabCategories;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.NonNullList;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,6 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class CreativeModeItemPickerMenuVirtualTailMixin implements CreativeModeItemPickerMenuVirtualTail {
     @Shadow
     @Final
+    @Mutable
     public NonNullList<ItemStack> items;
 
     @Unique
@@ -31,6 +35,18 @@ public abstract class CreativeModeItemPickerMenuVirtualTailMixin implements Crea
     @Unique
     private CreativeItemGroups visualCreativeTabEditor$groups;
 
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void visualCreativeTabEditor$observeItemChanges(CallbackInfo callback) {
+        this.items = new CreativeMenuItemList(this.items, () -> {
+            if (this.visualCreativeTabEditor$groups != null) {
+                this.visualCreativeTabEditor$groups.invalidate();
+            }
+        });
+        if (this.visualCreativeTabEditor$groups != null) {
+            this.visualCreativeTabEditor$groups.invalidate();
+        }
+    }
+
     @Override
     @Unique
     public CreativeItemGroups visualCreativeTabEditor$itemGroups() {
@@ -38,8 +54,13 @@ public abstract class CreativeModeItemPickerMenuVirtualTailMixin implements Crea
             this.visualCreativeTabEditor$groups = new CreativeItemGroups();
         }
         if (this.visualCreativeTabEditor$groups.tab() != null) {
-            this.visualCreativeTabEditor$groups.setGrouping(CreativeTabRuntime.definition(this.visualCreativeTabEditor$groups.tab())
+            var definition = CreativeTabRuntime.definition(this.visualCreativeTabEditor$groups.tab());
+            this.visualCreativeTabEditor$groups.setGrouping(definition
                     .map(CreativeTabDefinition::grouping).orElse(CreativeItemGrouping.EMPTY));
+            if (this.visualCreativeTabEditor$groups.categoryFilter().setCategories(definition
+                    .map(CreativeTabDefinition::categories).orElse(CreativeTabCategories.EMPTY))) {
+                this.visualCreativeTabEditor$groups.invalidate();
+            }
         }
         this.visualCreativeTabEditor$groups.refresh(this.items);
         return this.visualCreativeTabEditor$groups;

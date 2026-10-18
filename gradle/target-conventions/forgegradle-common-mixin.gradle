@@ -1,0 +1,32 @@
+def mixinPluginVersion = project.ext.templeMixinPluginVersion
+
+// MixinGradle adds target AP arguments in doFirst, after common must compile.
+afterEvaluate {
+    def mx = extensions.getByName('mixin')
+    def targetCompile = tasks.named('compileJava', JavaCompile).get()
+    def commonCompile = project(':common').tasks.named('compileJava', JavaCompile).get()
+    File mappings = mx.getMappings() as File
+    File outMappings = new File(commonCompile.temporaryDir, 'common-mappings.tsrg')
+    File outRefmap = commonCompile.destinationDirectory.file('mixin.common.refmap.json').get().asFile
+    def args = targetCompile.options.compilerArgs.findAll {
+        it.startsWith('-A') && !it.startsWith('-AoutTsrgFile=') && !it.startsWith('-AoutRefMapFile=')
+    }.collect { it.toString() }
+    args.addAll([
+            "-AreobfTsrgFile=${mappings.canonicalPath}",
+            "-AoutTsrgFile=${outMappings.canonicalPath}",
+            "-AoutRefMapFile=${outRefmap.canonicalPath}",
+            "-AmappingTypes=${mx.mappingTypes ? mx.mappingTypes.join(',') : 'tsrg'}",
+            "-ApluginVersion=${mixinPluginVersion}"
+    ].collect { it.toString() })
+    if (mx.defaultObfuscationEnv) args.add("-AdefaultObfuscationEnv=${mx.defaultObfuscationEnv}".toString())
+    ['disableTargetValidator', 'disableTargetExport', 'disableOverwriteChecker', 'quiet', 'showMessageTypes'].each { option ->
+        if (mx."${option}") args.add("-A${option}=true".toString())
+    }
+    if (mx.tokens) args.add("-Atokens=${mx.tokens.collect { k, v -> "${k}=${v}" }.join(';')}".toString())
+    mx.messages.each { k, v -> args.add("-AMSG_${k}=${v}".toString()) }
+    commonCompile.dependsOn(tasks.named('createMcpToSrg'))
+    commonCompile.inputs.file(mappings)
+    commonCompile.outputs.files(outMappings, outRefmap)
+    commonCompile.options.compilerArgs.addAll(args)
+    commonCompile.doFirst { outMappings.parentFile.mkdirs() }
+}

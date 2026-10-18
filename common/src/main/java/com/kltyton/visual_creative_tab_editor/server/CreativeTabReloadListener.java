@@ -15,27 +15,15 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-// @target if minecraft_version=26.1.2,26.2
-//|import net.minecraft.core.Holder;
-// @target else
-// @target end
 import net.minecraft.core.HolderLookup;
-// @target if minecraft_version=26.1.2,26.2
-//|import net.minecraft.core.registries.BuiltInRegistries;
-// @target else
-// @target end
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 
 /** Reads creative tab JSON resources in their real low-to-high pack-stack order. */
-// @target if minecraft_version=26.1.2,26.2
-//|public final class CreativeTabReloadListener extends SimplePreparableReloadListener<CreativeTabReloadListener.Prepared> {
-// @target else
 public class CreativeTabReloadListener extends SimplePreparableReloadListener<CreativeTabReloadListener.Prepared> {
-// @target end
     private final HolderLookup.Provider registries;
 
     public CreativeTabReloadListener(HolderLookup.Provider registries) {
@@ -50,37 +38,34 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
     public Prepared prepareCatalog(ResourceManager manager) {
         long sourceRevision = CreativeTabServerManager.revision();
         long sourceMutationEpoch = CreativeTabServerManager.packMutationEpoch();
-        Map<ResourceLocation, List<Layer>> resources = new LinkedHashMap<>();
+        Map<ResourceId, List<Layer>> resources = new LinkedHashMap<>();
         boolean defaultResourceSeen = false;
         boolean defaultResourcesValid = true;
-        List<Map.Entry<ResourceLocation, List<Resource>>> entries = new ArrayList<>(manager.listResourceStacks(
-                CreativeTabJsonCodec.DIRECTORY,
-                id -> id.getPath().endsWith(".json")
-        ).entrySet());
-        entries.sort(Map.Entry.comparingByKey(Comparator.comparing(ResourceLocation::toString)));
-// @target if minecraft_version=26.1.2,26.2
-//|
-//|        if (!entries.isEmpty()
-//|                && BuiltInRegistries.ITEM.listElements().map(Holder::areComponentsBound).anyMatch(bound -> !bound)) {
-//|            VisualCreativeTabEditorConstants.LOGGER.info(
-//|                    "Deferring creative-tab data until item prototype components are bound"
-//|            );
-//|            CreativeTabCatalog empty = CreativeTabCatalog.EMPTY;
-//|            return new Prepared(
-//|                    empty,
-//|                    empty,
-//|                    false,
-//|                    this.registries,
-//|                    CreativeTabServerManager.prepareSnapshot(empty, empty, this.registries),
-//|                    sourceRevision,
-//|                    sourceMutationEpoch
-//|            );
-//|        }
-// @target else
-// @target end
+        List<Map.Entry<ResourceId, List<Resource>>> entries = new ArrayList<>();
+        manager.listResourceStacks(CreativeTabJsonCodec.DIRECTORY, id -> id.getPath().endsWith(".json"))
+                .forEach((id, stack) -> entries.add(Map.entry(
+                        com.kltyton.visual_creative_tab_editor.platform.registry.NativeIds.wrap(id), stack)));
+        entries.sort(Map.Entry.comparingByKey(Comparator.comparing(ResourceId::toString)));
 
-        for (Map.Entry<ResourceLocation, List<Resource>> entry : entries) {
-            ResourceLocation tabId = CreativeTabJsonCodec.tabIdFromResourceFile(entry.getKey());
+        if (!entries.isEmpty()
+                && com.kltyton.visual_creative_tab_editor.platform.registry.NativeReloadReadiness.shouldDefer()) {
+            VisualCreativeTabEditorConstants.LOGGER.info(
+                    "Deferring creative-tab data until item prototype components are bound"
+            );
+            CreativeTabCatalog empty = CreativeTabCatalog.EMPTY;
+            return new Prepared(
+                    empty,
+                    empty,
+                    false,
+                    this.registries,
+                    CreativeTabServerManager.prepareSnapshot(empty, empty, this.registries),
+                    sourceRevision,
+                    sourceMutationEpoch
+            );
+        }
+
+        for (Map.Entry<ResourceId, List<Resource>> entry : entries) {
+            ResourceId tabId = CreativeTabJsonCodec.tabIdFromResourceFile(entry.getKey());
             List<Layer> layers = new ArrayList<>();
             for (Resource resource : entry.getValue()) {
                 String source = resource.sourcePackId();
@@ -113,8 +98,8 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
             }
         }
 
-        Map<ResourceLocation, ResolvedBase> baseDefinitions = new LinkedHashMap<>();
-        for (Map.Entry<ResourceLocation, List<Layer>> entry : resources.entrySet()) {
+        Map<ResourceId, ResolvedBase> baseDefinitions = new LinkedHashMap<>();
+        for (Map.Entry<ResourceId, List<Layer>> entry : resources.entrySet()) {
             List<Layer> baseLayers = entry.getValue().stream()
                     .filter(layer -> !layer.sourcePackId().equals(PinnedWorldPackSource.PLAYER_PACK_ID))
                     .toList();
@@ -125,8 +110,8 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
         }
 
         CreativeTabCatalog base = buildBaseCatalog(baseDefinitions);
-        Map<ResourceLocation, CreativeTabDefinition> resolvedDefinitions = new LinkedHashMap<>(base.definitions());
-        for (Map.Entry<ResourceLocation, List<Layer>> entry : resources.entrySet()) {
+        Map<ResourceId, CreativeTabDefinition> resolvedDefinitions = new LinkedHashMap<>(base.definitions());
+        for (Map.Entry<ResourceId, List<Layer>> entry : resources.entrySet()) {
             List<Layer> playerLayers = entry.getValue().stream()
                     .filter(layer -> layer.sourcePackId().equals(PinnedWorldPackSource.PLAYER_PACK_ID))
                     .toList();
@@ -158,7 +143,7 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
                     continue;
                 }
 
-                Map<ResourceLocation, CreativeTabDefinition> candidateDefinitions = new LinkedHashMap<>(resolvedDefinitions);
+                Map<ResourceId, CreativeTabDefinition> candidateDefinitions = new LinkedHashMap<>(resolvedDefinitions);
                 candidateDefinitions.put(entry.getKey(), candidate);
                 try {
                     catalogOf(candidateDefinitions);
@@ -222,7 +207,7 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
                 && patch.background().isPresent();
     }
 
-    private static ResolvedBase resolveBaseLayers(ResourceLocation id, List<Layer> layers) {
+    private static ResolvedBase resolveBaseLayers(ResourceId id, List<Layer> layers) {
         CreativeTabDefinition current = CreativeTabDefinition.defaults(id);
         boolean applied = false;
         boolean hasThirdParty = false;
@@ -246,7 +231,7 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
         return applied ? new ResolvedBase(current, hasThirdParty) : null;
     }
 
-    private static CreativeTabPatch mergeOwnedLayers(ResourceLocation id, List<Layer> layers) {
+    private static CreativeTabPatch mergeOwnedLayers(ResourceId id, List<Layer> layers) {
         CreativeTabPatch merged = CreativeTabPatch.empty();
         boolean applied = false;
         for (Layer layer : layers) {
@@ -261,8 +246,8 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
     }
 
     private static void addBaseDefinition(
-            Map<ResourceLocation, ResolvedBase> definitions,
-            ResourceLocation id,
+            Map<ResourceId, ResolvedBase> definitions,
+            ResourceId id,
             ResolvedBase candidate
     ) {
         long candidateItems = itemCount(candidate.definition());
@@ -280,8 +265,8 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
         }
 
         while (wouldExceedLimits(definitions, candidateItems)) {
-            ResourceLocation removable = null;
-            for (Map.Entry<ResourceLocation, ResolvedBase> entry : definitions.entrySet()) {
+            ResourceId removable = null;
+            for (Map.Entry<ResourceId, ResolvedBase> entry : definitions.entrySet()) {
                 if (!entry.getValue().hasThirdParty()) {
                     removable = entry.getKey();
                 }
@@ -300,7 +285,7 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
         definitions.put(id, candidate);
     }
 
-    private static boolean wouldExceedLimits(Map<ResourceLocation, ResolvedBase> definitions, long candidateItems) {
+    private static boolean wouldExceedLimits(Map<ResourceId, ResolvedBase> definitions, long candidateItems) {
         if (definitions.size() + 1 > CreativeTabValidation.MAX_TABS) {
             return true;
         }
@@ -316,10 +301,10 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
 
     private static long itemCount(CreativeTabDefinition definition) {
         return (long) definition.itemCount() + definition.searchItemCount()
-                + definition.grouping().referencedItemCount();
+                + definition.grouping().referencedItemCount() + definition.categories().referencedItemCount();
     }
 
-    private static CreativeTabCatalog buildBaseCatalog(Map<ResourceLocation, ResolvedBase> definitions) {
+    private static CreativeTabCatalog buildBaseCatalog(Map<ResourceId, ResolvedBase> definitions) {
         if (definitions.isEmpty()) {
             return CreativeTabCatalog.EMPTY;
         }
@@ -338,13 +323,13 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
         }
     }
 
-    private static CreativeTabCatalog catalogOf(Map<ResourceLocation, CreativeTabDefinition> definitions) {
+    private static CreativeTabCatalog catalogOf(Map<ResourceId, CreativeTabDefinition> definitions) {
         return definitions.isEmpty()
                 ? CreativeTabCatalog.EMPTY
                 : new CreativeTabCatalog(definitions.values());
     }
 
-    private static void warnIgnoredOwnedLayer(ResourceLocation id, Layer layer, RuntimeException exception) {
+    private static void warnIgnoredOwnedLayer(ResourceId id, Layer layer, RuntimeException exception) {
         VisualCreativeTabEditorConstants.LOGGER.warn(
                 "Ignoring invalid creative-tab layer {} from owned pack {} until it can be regenerated",
                 id,
@@ -353,7 +338,7 @@ public class CreativeTabReloadListener extends SimplePreparableReloadListener<Cr
         );
     }
 
-    private static boolean isEditorCustomTab(ResourceLocation id) {
+    private static boolean isEditorCustomTab(ResourceId id) {
         return (id.getNamespace().equals(VisualCreativeTabEditorConstants.MOD_ID)
                 || id.getNamespace().equals(VisualCreativeTabEditorConstants.LEGACY_MOD_ID))
                 && id.getPath().startsWith("custom/");

@@ -4,7 +4,6 @@ plugins {
     id 'net.fabricmc.fabric-loom' version '1.16.3'
 }
 apply from: file('../../gradle/target-conventions/base.gradle')
-apply from: file('../../gradle/target-conventions/shared-java.gradle')
 
 dependencies {
     minecraft("com.mojang:minecraft:${minecraft_version}")
@@ -13,7 +12,7 @@ dependencies {
 }
 
 loom {
-    def classTweaker = file("../../versions/26.1.2/" + "src/main/resources/${mod_id}.classtweaker")
+    def classTweaker = file("../../common/src/compat/minecraft/26.1.2/" + "resources/${mod_id}.classtweaker")
     if (classTweaker.exists()) {
         accessWidenerPath.set(classTweaker)
     }
@@ -53,3 +52,13 @@ sourceSets.configureEach {
 }
 
 apply from: file('../../gradle/target-conventions/publish.gradle')
+
+loom {
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+            sourceSet project(':common').sourceSets.main, project(':common')
+        }
+    }
+}
+sourceSets.main.runtimeClasspath += project(':common').sourceSets.main.output

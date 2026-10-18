@@ -1,5 +1,6 @@
 package com.kltyton.visual_creative_tab_editor.data.itemgroup;
 
+import com.kltyton.visual_creative_tab_editor.platform.item.StackData;
 import com.kltyton.visual_creative_tab_editor.data.CreativeTabValidation;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -175,20 +176,12 @@ public record CreativeItemGrouping(List<CreativeItemGroup> groups, List<ItemStac
 
         @Override
         public boolean equals(Object other) {
-// @target if minecraft_version=1.20.1
-//|            return other instanceof ItemKey key && ItemStack.isSameItemSameTags(this.stack, key.stack);
-// @target else
-            return other instanceof ItemKey key && ItemStack.isSameItemSameComponents(this.stack, key.stack);
-// @target end
+            return other instanceof ItemKey key && StackData.same(this.stack, key.stack);
         }
 
         @Override
         public int hashCode() {
-// @target if minecraft_version=1.20.1
-//|            return 31 * this.stack.getItem().hashCode() + Objects.hashCode(this.stack.getTag());
-// @target else
-            return 31 * this.stack.getItem().hashCode() + this.stack.getComponents().hashCode();
-// @target end
+            return StackData.hash(this.stack);
         }
     }
 }

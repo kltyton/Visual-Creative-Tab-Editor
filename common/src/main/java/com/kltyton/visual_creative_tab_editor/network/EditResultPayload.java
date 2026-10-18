@@ -4,19 +4,9 @@ import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import io.netty.handler.codec.DecoderException;
 import java.util.Objects;
 import java.util.UUID;
-// @target if minecraft_version=1.20.1
-//|import net.minecraft.network.FriendlyByteBuf;
-// @target else
-import net.minecraft.network.RegistryFriendlyByteBuf;
-// @target end
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-// @target if minecraft_version=1.20.1
-// @target else
-import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-// @target end
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 
 /** Server acknowledgement for one completed edit transaction. */
 public record EditResultPayload(
@@ -25,19 +15,9 @@ public record EditResultPayload(
         long revision,
         boolean canEdit,
         Component message
-// @target if minecraft_version=1.20.1
-//|) implements CreativeTabPayload {
-//|    public static final ResourceLocation ID =
-//|            new ResourceLocation(VisualCreativeTabEditorConstants.MOD_ID, "edit_result_v3");
-// @target else
-) implements CustomPacketPayload {
-    public static final Type<EditResultPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_result_v3")
-    );
-
-    public static final StreamCodec<RegistryFriendlyByteBuf, EditResultPayload> STREAM_CODEC =
-            CustomPacketPayload.codec(EditResultPayload::write, EditResultPayload::decode);
-// @target end
+) implements CreativeTabPayload {
+    public static final ResourceId ID =
+            ResourceId.fromNamespaceAndPath(VisualCreativeTabEditorConstants.MOD_ID, "edit_result_v4");
 
     public EditResultPayload {
         Objects.requireNonNull(sessionId, "sessionId");
@@ -48,48 +28,27 @@ public record EditResultPayload(
     }
 
     @Override
-// @target if minecraft_version=1.20.1
-//|    public ResourceLocation id() {
-//|        return ID;
-// @target else
-    public Type<EditResultPayload> type() {
-        return TYPE;
-// @target end
+    public ResourceId payloadId() {
+        return ID;
     }
 
-// @target if minecraft_version=1.20.1
-//|    @Override
-//|    public void write(FriendlyByteBuf buffer) {
-// @target else
-    private void write(RegistryFriendlyByteBuf buffer) {
-// @target end
+    @Override
+    public void write(FriendlyByteBuf buffer) {
         buffer.writeUUID(sessionId);
         buffer.writeBoolean(success);
         buffer.writeVarLong(revision);
         buffer.writeBoolean(canEdit);
-// @target if minecraft_version=1.20.1
-//|        buffer.writeComponent(message);
-// @target else
-        ComponentSerialization.STREAM_CODEC.encode(buffer, message);
-// @target end
+        NativeComponentBuffer.write(buffer, message);
     }
 
-// @target if minecraft_version=1.20.1
-//|    public static EditResultPayload decode(FriendlyByteBuf buffer) {
-// @target else
-    private static EditResultPayload decode(RegistryFriendlyByteBuf buffer) {
-// @target end
+    public static EditResultPayload decode(FriendlyByteBuf buffer) {
         try {
             return new EditResultPayload(
                     buffer.readUUID(),
                     buffer.readBoolean(),
                     buffer.readVarLong(),
                     buffer.readBoolean(),
-// @target if minecraft_version=1.20.1
-//|                    buffer.readComponent()
-// @target else
-                    ComponentSerialization.STREAM_CODEC.decode(buffer)
-// @target end
+                    NativeComponentBuffer.read(buffer)
             );
         } catch (DecoderException exception) {
             throw exception;

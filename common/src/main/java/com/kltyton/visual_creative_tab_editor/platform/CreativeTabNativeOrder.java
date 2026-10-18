@@ -14,6 +14,14 @@ public final class CreativeTabNativeOrder {
     private CreativeTabNativeOrder() {
     }
 
+    public static List<CreativeModeTab> complete(List<CreativeModeTab> registryOrder, List<CreativeModeTab> nativeOrder) {
+        List<CreativeModeTab> ordered = new java.util.ArrayList<>(nativeOrder);
+        for (CreativeModeTab tab : registryOrder) {
+            if (!ordered.contains(tab)) { ordered.add(tab); }
+        }
+        return ordered;
+    }
+
     public static void install(Function<List<CreativeModeTab>, List<CreativeModeTab>> provider) {
         PROVIDER.set(Objects.requireNonNull(provider, "provider"));
     }

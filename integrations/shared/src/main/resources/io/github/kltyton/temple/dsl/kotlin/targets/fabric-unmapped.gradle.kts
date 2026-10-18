@@ -21,3 +21,11 @@ extensions.getByType<FabricApiExtension>().configureDataGeneration {
     client.set(true)
 }
 apply(from = file("../../gradle/target-conventions/publish.gradle.kts"))
+extensions.getByType<net.fabricmc.loom.api.LoomGradleExtensionAPI>().mods.create(mod_id) {
+    sourceSet(sourceSets.main.get())
+    sourceSet(project(":common").extensions.getByType<SourceSetContainer>().named("main").get(), project(":common"))
+}
+
+sourceSets.main.get().runtimeClasspath += project(":common").extensions.getByType<SourceSetContainer>().named("main").get().output
+extensions.getByType<net.fabricmc.loom.api.LoomGradleExtensionAPI>().accessWidenerPath.set(
+    file("../../common/src/compat/minecraft/$minecraft_version/resources/$mod_id.classtweaker"))

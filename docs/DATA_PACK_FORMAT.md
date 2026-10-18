@@ -130,7 +130,39 @@ flowchart LR
     D --> E[Representative icon and expandable members]
 ```
 
-The client option `config/visual_creative_tab_editor/client.json` controls whether groups are displayed. Setting `group_similar_items` to `false` retains the saved definitions and shows the original flat list after a client restart. Client and server must use the same mod version for shared layout editing.
+The client option `config/visual_creative_tab_editor/client.json` controls whether groups are displayed. The editor's **Unfold all** button writes `group_similar_items: false` and immediately shows a flat list without deleting group definitions. **Fold items** enables grouping again. Client and server must use matching editing protocols for shared layout editing.
+
+## Categories within a tab
+
+The optional `categories` array defines named filters within a `category` tab. It is independent of `item_groups`. Omitting it inherits the lower-priority value; an empty array removes the categories. Each entry requires `id`, `title`, `icon` and `items`:
+
+```json
+{
+  "categories": [
+    {
+      "id": "custom/building",
+      "title": { "text": "Building" },
+      "icon": { "id": "minecraft:bricks", "count": 1 },
+      "items": [
+        { "id": "minecraft:bricks", "count": 1 },
+        { "id": "minecraft:brick_stairs", "count": 1 }
+      ]
+    }
+  ]
+}
+```
+
+Category identifiers must be unique within their parent tab. A category may be empty, and an item may belong to several categories. Members use complete NBT/component identities and do not add items to the parent tab or global search. Filters intersect the current native item list, preserving filters supplied by other mods. The category order follows the array order. Browsing selections are local to the open creative screen; category definitions use the normal layout save, cancel and undo flow.
+
+```mermaid
+flowchart LR
+    A[Current native item list] --> C[Selected category union]
+    B[Category definitions] --> C
+    C --> D[Item group projection]
+    D --> E[Visible grid]
+```
+
+Category documents keep format `1`, so existing documents without the field retain their original meaning. Category-aware network payloads use protocol `4` and separate optional channels; older protocol peers are not sent documents they cannot decode.
 
 ## Limits and failure behavior
 
@@ -138,6 +170,7 @@ The client option `config/visual_creative_tab_editor/client.json` controls wheth
 - 262144 stacks in `items` and 262144 stacks in `search_items` per tab, with 2097152
   configured stacks total across the catalog.
 - Group members and ungrouped exceptions have a separate combined limit of 262144 references per tab and 2097152 across the catalog.
+- Each category tab supports up to 512 categories and 262144 category member references. Category and item-group references share the catalog-wide reference limit.
 - Unknown fields, invalid identifiers, empty stacks, invalid components, and
   unsupported schema versions fail the resource reload.
 - Stale entries in the two reserved, Mod-owned world packs are skipped instead

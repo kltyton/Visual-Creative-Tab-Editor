@@ -2,7 +2,7 @@ package com.kltyton.visual_creative_tab_editor.client.editor;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
 
@@ -91,18 +91,18 @@ public enum CreativeTabSortMode {
     }
 
     private static String idPath(ItemStack stack) {
-        ResourceLocation id = itemId(stack);
+        ResourceId id = itemId(stack);
         return id == null ? fullId(stack) : id.getPath();
     }
 
     private static String namespace(ItemStack stack) {
-        ResourceLocation id = itemId(stack);
+        ResourceId id = itemId(stack);
         return id == null ? "" : id.getNamespace();
     }
 
     private static String fullId(ItemStack stack) {
         ItemStack checked = requireStack(stack);
-        ResourceLocation id = itemId(checked);
+        ResourceId id = itemId(checked);
         if (id != null) {
             return id.toString();
         }
@@ -110,8 +110,8 @@ public enum CreativeTabSortMode {
                 + '/' + checked.getItem().getDescriptionId();
     }
 
-    private static ResourceLocation itemId(ItemStack stack) {
-        return BuiltInRegistries.ITEM.getKey(requireStack(stack).getItem());
+    private static ResourceId itemId(ItemStack stack) {
+        return com.kltyton.visual_creative_tab_editor.platform.registry.NativeIds.wrap(BuiltInRegistries.ITEM.getKey(requireStack(stack).getItem()));
     }
 
     private static ItemStack requireStack(ItemStack stack) {

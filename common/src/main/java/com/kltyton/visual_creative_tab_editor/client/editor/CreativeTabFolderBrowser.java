@@ -5,28 +5,35 @@ import com.kltyton.visual_creative_tab_editor.VisualCreativeTabEditorConstants;
 import com.kltyton.visual_creative_tab_editor.client.CreativeTabClientPlatform;
 import com.kltyton.visual_creative_tab_editor.client.CreativeTabClientState;
 import com.kltyton.visual_creative_tab_editor.runtime.CreativeTabRuntime;
+import com.kltyton.visual_creative_tab_editor.platform.item.StackData;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-import net.minecraft.client.gui.GuiGraphics;
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorGraphics;
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorTheme;
+import com.kltyton.visual_creative_tab_editor.client.editor.render.EditorTheme.Tone;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 /** Collapsible navigation over native contents; the editor's item indices remain untouched. */
 public final class CreativeTabFolderBrowser {
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private final CreativeTabEditorHost host;
     private final ItemPicker picker;
+    private final ItemStack tabsIcon = new ItemStack(Items.BOOK);
+    private final ItemStack itemsIcon = new ItemStack(Items.CHEST);
     private final View tabs = new View();
     private final View items = new View();
     private final List<Row> rows = new ArrayList<>();
     private final Map<String, List<CreativeModeTab>> tabGroups = new TreeMap<>(CreativeTabFolderBrowser::compareSources);
     private final Map<String, List<ItemEntry>> itemGroups = new TreeMap<>(CreativeTabFolderBrowser::compareSources);
     private Kind kind = Kind.CLOSED;
+    private boolean launchersExpanded;
     private CreativeModeTab sourceTab;
     private int scroll;
     private int columns;
@@ -52,10 +59,15 @@ public final class CreativeTabFolderBrowser {
     }
 
     public boolean isOpen() { return this.kind != Kind.CLOSED; }
-    public void close() { this.kind = Kind.CLOSED; }
+    public void close() { this.kind = Kind.CLOSED; this.launchersExpanded = false; }
 
     public boolean click(double x, double y, int button, boolean shift) {
         if (!isOpen()) {
+            if (button == 0 && toggleButton().contains(x, y)) {
+                this.launchersExpanded = !this.launchersExpanded;
+                return true;
+            }
+            if (!this.launchersExpanded) { return false; }
             if (button == 0 && launcher(0).contains(x, y)) { open(Kind.TABS); return true; }
             if (button == 0 && canBrowseItems() && launcher(1).contains(x, y)) { open(Kind.ITEMS); return true; }
             return false;
@@ -100,11 +112,7 @@ public final class CreativeTabFolderBrowser {
                 ItemEntry item = row.items.get(column);
                 var menu = this.host.visualCreativeTabEditor$menu();
                 if (this.host.visualCreativeTabEditor$selectedTab() != this.sourceTab || item.index >= menu.items.size()
-// @target if minecraft_version=1.20.1
-//|                        || !ItemStack.isSameItemSameTags(item.stack, menu.items.get(item.index))) {
-// @target else
-                        || !ItemStack.isSameItemSameComponents(item.stack, menu.items.get(item.index))) {
-// @target end
+                        || !StackData.same(item.stack, menu.items.get(item.index))) {
                     open(Kind.ITEMS);
                     return true;
                 }
@@ -171,30 +179,26 @@ public final class CreativeTabFolderBrowser {
         this.scroll = Math.min(this.scroll, Math.max(0, this.rows.size() - visibleRows(panel())));
     }
 
-    public void render(GuiGraphics graphics, int mouseX, int mouseY) {
+    public void render(EditorGraphics graphics, int mouseX, int mouseY) {
         if (!isOpen()) {
-            button(graphics, launcher(0), Component.translatable("visual_creative_tab_editor.folders.tabs"), mouseX, mouseY, false);
+            toggleButton(graphics, mouseX, mouseY);
+            if (!this.launchersExpanded) { return; }
+            launcherButton(graphics, 0, mouseX, mouseY);
             if (canBrowseItems()) {
-                button(graphics, launcher(1), Component.translatable("visual_creative_tab_editor.folders.items"), mouseX, mouseY, false);
+                launcherButton(graphics, 1, mouseX, mouseY);
             }
             return;
         }
-// @target if minecraft_version=26.1.2,26.2
-//|        graphics.nextStratum();
-// @target else
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 400);
-// @target end
+        graphics.layer(400.0F, () -> {
         Bounds panel = panel();
         int currentColumns = Math.max(1, (panel.width - 40) / 20);
         if (currentColumns != this.columns) {
             this.columns = currentColumns;
             rebuildRows();
         }
-        graphics.fill(0, 0, this.host.visualCreativeTabEditor$screenWidth(), this.host.visualCreativeTabEditor$screenHeight(), 0xB0000000);
-        graphics.fill(panel.x, panel.y, panel.x + panel.width, panel.y + panel.height, 0xFF252525);
-        graphics.renderOutline(panel.x, panel.y, panel.width, panel.height, 0xFFC6C6C6);
-        text(graphics, Component.translatable(this.kind == Kind.TABS ? "visual_creative_tab_editor.folders.tabs" : "visual_creative_tab_editor.folders.items"), panel.x + 8, panel.y + 8, 0xFFFFFFFF, panel.width - 70);
+        graphics.fill(0, 0, this.host.visualCreativeTabEditor$screenWidth(), this.host.visualCreativeTabEditor$screenHeight(), EditorTheme.SCRIM);
+        EditorTheme.panel(graphics, panel.x, panel.y, panel.width, panel.height, 22);
+        text(graphics, Component.translatable(this.kind == Kind.TABS ? "visual_creative_tab_editor.folders.tabs" : "visual_creative_tab_editor.folders.items"), panel.x + 8, panel.y + 8, EditorTheme.TEXT_DARK, panel.width - 70);
         button(graphics, closeButton(panel), Component.literal("X"), mouseX, mouseY, false);
         String[] filters = {"all", "vanilla", "mods"};
         for (int index = 0; index < filters.length; index++) {
@@ -208,28 +212,29 @@ public final class CreativeTabFolderBrowser {
             if (row.tab == null && row.items == null) {
                 boolean hidden = view().hidden.contains(row.source);
                 boolean expanded = view().expanded.contains(row.source);
-                graphics.fill(panel.x + 6, y, panel.x + panel.width - 12, y + 18, hidden ? 0xFF333333 : 0xFF4B4B4B);
+                EditorTheme.row(graphics, panel.x + 6, y, panel.width - 18, 18, expanded && !hidden,
+                        mouseX >= panel.x + 6 && mouseX < panel.x + panel.width - 12 && mouseY >= y && mouseY < y + 18);
                 graphics.fill(panel.x + 22, y + 5, panel.x + 36, y + 15, hidden ? 0xFF77705A : 0xFFD6AD43);
                 graphics.fill(panel.x + 22, y + 3, panel.x + 29, y + 5, hidden ? 0xFF77705A : 0xFFE9C36B);
                 text(graphics, Component.literal(expanded ? "-" : "+"), panel.x + 10, y + 5, 0xFFFFFFFF, 10);
                 int entries = this.kind == Kind.TABS ? this.tabGroups.get(row.source).size() : this.itemGroups.get(row.source).size();
                 String label = (row.source.equals("minecraft") ? Component.translatable("visual_creative_tab_editor.folders.vanilla").getString() : row.source) + " (" + entries + ")";
                 text(graphics, Component.literal(label), panel.x + 42, y + 5, hidden ? 0xFFAAAAAA : 0xFFFFFFFF, panel.width - 82);
-                text(graphics, Component.literal(hidden ? "[ ]" : "[x]"), panel.x + panel.width - 33, y + 5, 0xFFFFFFFF, 22);
+                EditorTheme.checkbox(graphics, panel.x + panel.width - 31, y + 3, 12, !hidden, false);
             } else if (row.tab != null) {
-                graphics.renderItem(row.tab.getIconItem(), panel.x + 24, y + 1);
+                graphics.item(row.tab.getIconItem(), panel.x + 24, y + 1);
                 text(graphics, row.tab.getDisplayName(), panel.x + 44, y + 5, 0xFFFFFFFF, panel.width - 60);
                 if (mouseY >= y && mouseY < y + 20 && mouseX >= panel.x + 18 && mouseX < panel.x + panel.width - 14) {
-                    graphics.renderOutline(panel.x + 18, y, panel.width - 32, 19, 0xFFFFFFFF);
+                    graphics.outline(panel.x + 18, y, panel.width - 32, 19, 0xFFFFFFFF);
                     hint = row.tab.getDisplayName();
                 }
             } else {
                 for (int column = 0; column < row.items.size(); column++) {
                     int x = panel.x + 18 + column * 20;
-                    graphics.fill(x, y, x + 18, y + 18, 0xFF666666);
-                    graphics.renderItem(row.items.get(column).stack, x + 1, y + 1);
+                    EditorTheme.inset(graphics, x, y, 18, 18, false);
+                    graphics.item(row.items.get(column).stack, x + 1, y + 1);
                     if (mouseX >= x && mouseX < x + 20 && mouseY >= y && mouseY < y + 20) {
-                        graphics.renderOutline(x, y, 18, 18, 0xFFFFFFFF);
+                        graphics.outline(x, y, 18, 18, 0xFFFFFFFF);
                         hint = row.items.get(column).stack.getHoverName();
                     }
                 }
@@ -242,36 +247,65 @@ public final class CreativeTabFolderBrowser {
             int track = count * 20;
             int thumb = Math.max(12, track * count / this.rows.size());
             int top = panel.y + 47 + (track - thumb) * this.scroll / (this.rows.size() - count);
-            graphics.fill(panel.x + panel.width - 8, top, panel.x + panel.width - 4, top + thumb, 0xFFC6C6C6);
+            graphics.fill(panel.x + panel.width - 9, panel.y + 47, panel.x + panel.width - 3, panel.y + 47 + track, EditorTheme.BORDER);
+            graphics.fill(panel.x + panel.width - 8, top, panel.x + panel.width - 4, top + thumb, EditorTheme.TEXT_MUTED);
         }
         text(graphics, hint, panel.x + 8, panel.y + panel.height - 15, 0xFFEEEEEE, panel.width - 16);
-// @target if minecraft_version=26.1.2,26.2
-// @target else
-        graphics.pose().popPose();
-// @target end
+        });
     }
 
-    private void button(GuiGraphics graphics, Bounds box, Component label, int mouseX, int mouseY, boolean selected) {
-        int face = selected ? 0xFF3C8527 : box.contains(mouseX, mouseY) ? 0xFFE0E0E0 : 0xFFC6C6C6;
-        graphics.fill(box.x, box.y, box.x + box.width, box.y + box.height, 0xFF222222);
-        graphics.fill(box.x + 1, box.y + 1, box.x + box.width - 1, box.y + box.height - 3, face);
-        graphics.fill(box.x + 1, box.y + 1, box.x + box.width - 1, box.y + 2, 0xFFEEEEEE);
+    private void button(EditorGraphics graphics, Bounds box, Component label, int mouseX, int mouseY, boolean selected) {
+        int textColor = EditorTheme.button(graphics, box.x, box.y, box.width, box.height,
+                selected ? Tone.PRIMARY : Tone.NORMAL, true, box.contains(mouseX, mouseY));
         String clipped = this.host.visualCreativeTabEditor$font().plainSubstrByWidth(label.getString(), box.width - 6);
-        graphics.drawString(this.host.visualCreativeTabEditor$font(), clipped,
+        graphics.text(this.host.visualCreativeTabEditor$font(), clipped,
                 box.x + (box.width - this.host.visualCreativeTabEditor$font().width(clipped)) / 2, box.y + 5,
-                selected ? 0xFFFFFFFF : 0xFF202020, false);
+                textColor, false);
+        if (box.contains(mouseX, mouseY) && this.host.visualCreativeTabEditor$font().width(label) > box.width - 6) {
+            graphics.tooltip(this.host.visualCreativeTabEditor$font(), label, mouseX, mouseY);
+        }
     }
 
-    private void text(GuiGraphics graphics, Component label, int x, int y, int color, int width) {
-        graphics.drawString(this.host.visualCreativeTabEditor$font(), this.host.visualCreativeTabEditor$font().plainSubstrByWidth(label.getString(), Math.max(0, width)), x, y, color, false);
+    private void launcherButton(EditorGraphics graphics, int row, int mouseX, int mouseY) {
+        Bounds bounds = launcher(row);
+        Component label = Component.translatable("visual_creative_tab_editor.folders." + (row == 0 ? "tabs" : "items"));
+        EditorTheme.button(graphics, bounds.x, bounds.y, bounds.width, bounds.height,
+                Tone.NORMAL, true, bounds.contains(mouseX, mouseY));
+        graphics.item(row == 0 ? this.tabsIcon : this.itemsIcon, bounds.x + (bounds.width - 16) / 2, bounds.y + 1);
+        if (bounds.contains(mouseX, mouseY)) { graphics.tooltip(this.host.visualCreativeTabEditor$font(), label, mouseX, mouseY); }
+    }
+
+    private void text(EditorGraphics graphics, Component label, int x, int y, int color, int width) {
+        graphics.text(this.host.visualCreativeTabEditor$font(), this.host.visualCreativeTabEditor$font().plainSubstrByWidth(label.getString(), Math.max(0, width)), x, y, color, false);
     }
 
     private Bounds launcher(int row) {
-        int left = this.host.visualCreativeTabEditor$left();
-        int x = left >= 50 ? left - 48 : this.host.visualCreativeTabEditor$left() + this.host.visualCreativeTabEditor$imageWidth() + 4;
-        x = Math.min(x, this.host.visualCreativeTabEditor$screenWidth() - 46);
-        return new Bounds(Math.max(2, x), this.host.visualCreativeTabEditor$top() + 4 + row * 22, 44, 19);
+        Bounds handle = toggleButton();
+        return new Bounds(handle.x + (handle.width - 18) / 2, handle.y + 20 + row * 20, 18, 18);
     }
+
+    private Bounds toggleButton() {
+        return new Bounds(this.host.visualCreativeTabEditor$left() + this.host.visualCreativeTabEditor$imageWidth() - 1,
+                this.host.visualCreativeTabEditor$top() + 4, 12, 18);
+    }
+
+    private void toggleButton(EditorGraphics graphics, int mouseX, int mouseY) {
+        Bounds bounds = toggleButton();
+        int color = EditorTheme.button(graphics, bounds.x, bounds.y, bounds.width, bounds.height,
+                Tone.NORMAL, true, bounds.contains(mouseX, mouseY));
+        int x = bounds.x + bounds.width / 2;
+        int y = bounds.y + bounds.height / 2;
+        for (int step = 0; step < 3; step++) {
+            int column = this.launchersExpanded ? x - 1 + step : x + 1 - step;
+            graphics.fill(column, y - step, column + 1, y + step + 1, color);
+        }
+        if (bounds.contains(mouseX, mouseY)) {
+            graphics.tooltip(this.host.visualCreativeTabEditor$font(),
+                    Component.translatable("visual_creative_tab_editor.folders."
+                            + (this.launchersExpanded ? "collapse_drawers" : "expand_drawers")), mouseX, mouseY);
+        }
+    }
+
     private Bounds panel() {
         int width = Math.min(320, this.host.visualCreativeTabEditor$screenWidth() - 12);
         int height = Math.min(260, this.host.visualCreativeTabEditor$screenHeight() - 12);

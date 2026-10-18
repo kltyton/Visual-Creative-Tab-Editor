@@ -4,7 +4,6 @@ plugins {
     id 'fabric-loom' version '1.9-SNAPSHOT'
 }
 apply from: file('../../gradle/target-conventions/base.gradle')
-apply from: file('../../gradle/target-conventions/shared-java.gradle')
 
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
@@ -17,7 +16,7 @@ dependencies {
 }
 
 loom {
-    def aw = file("../../versions/1.21.1/" + "src/main/resources/${mod_id}.accesswidener")
+    def aw = file("../../common/src/compat/minecraft/1.21.1/" + "resources/${mod_id}.accesswidener")
     if (aw.exists()) {
         accessWidenerPath.set(aw)
     }
@@ -44,3 +43,16 @@ tasks.withType(JavaExec).configureEach {
 }
 
 apply from: file('../../gradle/target-conventions/publish.gradle')
+
+loom {
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+            sourceSet project(':common').sourceSets.main, project(':common')
+        }
+    }
+}
+sourceSets.main.runtimeClasspath += project(':common').sourceSets.main.output
+ext.templeMixinMappingServiceType = net.fabricmc.loom.task.service.MixinAPMappingService.TYPE
+ext.templeTinyRemapperServiceClass = net.fabricmc.loom.task.service.TinyRemapperService.class
+apply from: file('../../gradle/target-conventions/fabric-common-mixin.gradle')

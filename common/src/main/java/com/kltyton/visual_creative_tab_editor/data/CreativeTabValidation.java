@@ -1,7 +1,7 @@
 package com.kltyton.visual_creative_tab_editor.data;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import com.kltyton.visual_creative_tab_editor.data.ResourceId;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Collection;
@@ -22,16 +22,10 @@ public final class CreativeTabValidation {
     public static final int MAX_CODEC_JSON_LENGTH = 131_072;
     public static final int MAX_DOCUMENT_JSON_LENGTH = 32 * 1024 * 1024;
     public static final int MAX_CATALOG_JSON_LENGTH = 64 * 1024 * 1024;
-    private static final Map<ResourceLocation, CreativeTabType> FIXED_VANILLA_TYPES = Map.of(
-// @target if minecraft_version=1.20.1
-//|            new ResourceLocation("minecraft", "hotbar"), CreativeTabType.HOTBAR,
-//|            new ResourceLocation("minecraft", "search"), CreativeTabType.SEARCH,
-//|            new ResourceLocation("minecraft", "inventory"), CreativeTabType.INVENTORY
-// @target else
-            ResourceLocation.withDefaultNamespace("hotbar"), CreativeTabType.HOTBAR,
-            ResourceLocation.withDefaultNamespace("search"), CreativeTabType.SEARCH,
-            ResourceLocation.withDefaultNamespace("inventory"), CreativeTabType.INVENTORY
-// @target end
+    private static final Map<ResourceId, CreativeTabType> FIXED_VANILLA_TYPES = Map.of(
+            ResourceId.withDefaultNamespace("hotbar"), CreativeTabType.HOTBAR,
+            ResourceId.withDefaultNamespace("search"), CreativeTabType.SEARCH,
+            ResourceId.withDefaultNamespace("inventory"), CreativeTabType.INVENTORY
     );
 
     private CreativeTabValidation() {
@@ -47,7 +41,7 @@ public final class CreativeTabValidation {
             throw new IllegalArgumentException("Too many creative tabs: " + definitions.size() + " > " + MAX_TABS);
         }
 
-        Set<ResourceLocation> ids = new HashSet<>();
+        Set<ResourceId> ids = new HashSet<>();
         long totalItems = 0;
         long totalGroupedItems = 0;
         boolean hasVisibleCategory = false;
@@ -65,7 +59,8 @@ public final class CreativeTabValidation {
             }
             // Definitions validate their private defensive copies during construction.
             totalItems += (long) definition.itemCount() + definition.searchItemCount();
-            totalGroupedItems += definition.grouping().referencedItemCount();
+            totalGroupedItems += (long) definition.grouping().referencedItemCount()
+                    + definition.categories().referencedItemCount();
             if (totalGroupedItems > MAX_TOTAL_ITEMS) {
                 throw new IllegalArgumentException("Too many item group references: " + totalGroupedItems);
             }
