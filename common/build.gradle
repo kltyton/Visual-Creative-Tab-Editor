@@ -1,4 +1,5 @@
 import groovy.json.JsonOutput
+import groovy.json.JsonGenerator
 import org.gradle.api.artifacts.ProjectDependency
 
 plugins { id 'java-library' }
@@ -81,12 +82,15 @@ tasks.named('processResources', ProcessResources) {
     def values = ['mod_id', 'mod_name', 'mod_version', 'mod_group_id', 'mod_authors', 'mod_license', 'mod_description']
             .collectEntries { key -> [(key): identity.getProperty(key)] }
     values.putAll([minecraft_version: minecraft, java_version: javaVersion])
+    def json = new JsonGenerator.Options().disableUnicodeEscaping().build()
     def escaped = values.collectEntries { key, value ->
-        def encoded = JsonOutput.toJson(value.toString())
+        def encoded = json.toJson(value.toString()).replace('\u007f', '\\u007f')
         [(key): encoded.substring(1, encoded.length() - 1)]
     }
     inputs.properties(values)
-    filesMatching(['*.mixins.json', 'pack.mcmeta']) { expand escaped }
+    filesMatching(['*.mixins.json', 'pack.mcmeta']) {
+        filter { line -> line.replaceAll(/\$\{([a-z_]+)\}/) { match, key -> escaped.containsKey(key) ? escaped[key] : match } }
+    }
 }
 tasks.named('processTestResources', ProcessResources) { from new File(commonRoot, 'src/test/resources') }
 tasks.named('sourcesJar', Jar) {
@@ -112,3 +116,4 @@ rootProject.afterEvaluate {
 }
 ext.templeResourceDirectories = resourceDirectories
 ext.templeSourceDirectories = javaDirectories + [constants]
+apply from: new File(templeRoot, 'gradle/target-conventions/ide-sources.gradle')

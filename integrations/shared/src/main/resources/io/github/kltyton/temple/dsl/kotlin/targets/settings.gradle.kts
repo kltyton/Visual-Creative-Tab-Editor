@@ -21,7 +21,7 @@ pluginManagement {
     }
 }
 val identity = Properties().apply { file("../../gradle.properties").reader(Charsets.UTF_8).use { load(it) } }
-rootProject.name = identity.getProperty("mod_name") + "-" + rootDir.name
+rootProject.name = identity.getProperty("mod_id") + "-" + rootDir.name
 
 include(":common")
 val selection = file("../../.temple/active-target")

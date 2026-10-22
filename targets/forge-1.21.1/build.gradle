@@ -109,6 +109,7 @@ sourceSets.each {
     it.java.destinationDirectory = dir
 }
 
+apply from: file('../../gradle/target-conventions/pack-metadata.gradle')
 apply from: file('../../gradle/target-conventions/publish.gradle')
 
 tasks.withType(net.minecraftforge.gradle.common.util.runs.MinecraftRunTask).configureEach {

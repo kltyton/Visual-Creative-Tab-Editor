@@ -6,6 +6,7 @@ import io.github.kltyton.temple.workspace.TargetPlan;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.*;
@@ -32,10 +33,16 @@ public final class TargetSelectionPanel extends JPanel {
     private final List<Map<String, String>> selected = new ArrayList<>();
     private final Consumer<List<Map<String, String>>> changed;
     private final JButton add = new JButton(), refresh = new JButton(), remove = new JButton();
+    private final JPanel targets = new JPanel(new BorderLayout(0, 8));
+    private final JPanel catalogControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+    private final JComboBox<String> defaultTarget = new JComboBox<>();
+    private Consumer<String> defaultTargetChanged;
+    private boolean updatingDefaultTarget;
     private UiText text;
     private VersionCatalog catalog;
     private int javaVersion;
     private boolean ready;
+    private boolean updatingLoaders;
     private String statusKey = "loading";
     private int statusCount;
     private int gameRequest;
@@ -55,24 +62,27 @@ public final class TargetSelectionPanel extends JPanel {
             selectors.add(label);
             selectors.add((Component) pair[1]);
         }
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        buttons.add(add);
-        buttons.add(refresh);
-        buttons.add(preview);
+        catalogControls.add(refresh);
+        catalogControls.add(preview);
         JPanel top = new JPanel(new BorderLayout(0, 8));
         top.add(selectors, BorderLayout.CENTER);
-        top.add(buttons, BorderLayout.SOUTH);
+        JPanel catalogStatus = new JPanel(new BorderLayout(0, 8));
+        catalogStatus.add(catalogControls, BorderLayout.NORTH);
+        catalogStatus.add(status, BorderLayout.SOUTH);
+        top.add(catalogStatus, BorderLayout.SOUTH);
         add(top, BorderLayout.NORTH);
         JTable table = new JTable(model);
         table.setRowHeight(Math.max(26, table.getFont().getSize() + 12));
         table.setFillsViewportHeight(true);
         JScrollPane scroll = new JScrollPane(table);
         scroll.setPreferredSize(new Dimension(660, 190));
-        add(scroll, BorderLayout.CENTER);
-        JPanel bottom = new JPanel(new BorderLayout(12, 0));
-        bottom.add(status, BorderLayout.CENTER);
-        bottom.add(remove, BorderLayout.EAST);
-        add(bottom, BorderLayout.SOUTH);
+        scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        targets.add(scroll, BorderLayout.CENTER);
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        buttons.add(add);
+        buttons.add(remove);
+        targets.add(buttons, BorderLayout.SOUTH);
+        add(targets, BorderLayout.CENTER);
         translate();
         initial.forEach(row -> { selected.add(new LinkedHashMap<>(row)); append(row); });
         for (JComboBox<String> box : List.of(minecraft, loader, version, api)) box.setEditable(false);
@@ -95,7 +105,7 @@ public final class TargetSelectionPanel extends JPanel {
             firePropertyChange("language", old, text);
         });
         minecraft.addActionListener(event -> loadGame());
-        loader.addActionListener(event -> updateLoader());
+        loader.addActionListener(event -> { if (!updatingLoaders) loadSelection(); });
         version.addActionListener(event -> updateReady());
         api.addActionListener(event -> updateReady());
         preview.addActionListener(event -> updateLoader());
@@ -105,7 +115,7 @@ public final class TargetSelectionPanel extends JPanel {
             if (row >= 0) {
                 selected.remove(row);
                 model.removeRow(row);
-                changed.accept(selections());
+                selectionChanged();
                 setStatus("selected", selected.size());
             }
         });
@@ -116,12 +126,72 @@ public final class TargetSelectionPanel extends JPanel {
 
     public UiText messages() { return text; }
 
+    public JPanel targetsPanel() { return targets; }
+
+    public void enableDefaultTargetSelection(Consumer<String> listener) {
+        defaultTargetChanged = listener;
+        JLabel label = new JLabel(text.get("defaultTarget"));
+        labels.put("defaultTarget", label);
+        JPanel row = new JPanel(new BorderLayout(12, 0));
+        row.add(label, BorderLayout.WEST);
+        row.add(defaultTarget, BorderLayout.CENTER);
+        defaultTarget.setEditable(false);
+        defaultTarget.setToolTipText(text.get("defaultTargetHint"));
+        defaultTarget.addActionListener(event -> {
+            if (!updatingDefaultTarget) defaultTargetChanged.accept(defaultTarget());
+        });
+        targets.add(row, BorderLayout.NORTH);
+        updateDefaultTargets();
+    }
+
+    public String defaultTarget() {
+        return defaultTarget.getSelectedItem() == null ? "" : defaultTarget.getSelectedItem().toString();
+    }
+
+    private void selectionChanged() {
+        if (defaultTargetChanged != null) updateDefaultTargets();
+        changed.accept(selections());
+    }
+
+    private void updateDefaultTargets() {
+        String previous = defaultTarget();
+        List<String> ids = selected.stream().map(row -> row.get("loader") + "-" + row.get("minecraft_version")).toList();
+        updatingDefaultTarget = true;
+        defaultTarget.setModel(new DefaultComboBoxModel<>(ids.toArray(String[]::new)));
+        if (ids.contains(previous)) defaultTarget.setSelectedItem(previous);
+        defaultTarget.setEnabled(!ids.isEmpty());
+        updatingDefaultTarget = false;
+        defaultTargetChanged.accept(defaultTarget());
+    }
+
+    public void configurationRows(BiConsumer<JLabel, JComponent> row) {
+        row.accept(labels.get("language"), language);
+        row.accept(labels.get("minecraft"), minecraft);
+        JPanel loaderChoices = new JPanel(new GridBagLayout());
+        GridBagConstraints constraints = new GridBagConstraints();
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.weightx = 0.35;
+        loaderChoices.add(loader, constraints);
+        constraints.weightx = 0;
+        constraints.insets = new Insets(0, 12, 0, 8);
+        loaderChoices.add(labels.get("loaderVersion"), constraints);
+        constraints.weightx = 0.65;
+        constraints.insets = new Insets(0, 0, 0, 0);
+        loaderChoices.add(version, constraints);
+        row.accept(labels.get("loader"), loaderChoices);
+        row.accept(labels.get("fabricApi"), api);
+        row.accept(labels.get("toolchain"), toolchain);
+        row.accept(null, catalogControls);
+        row.accept(null, status);
+    }
+
     public List<Map<String, String>> selections() {
         return selected.stream().map(LinkedHashMap::new).map(value -> (Map<String, String>) value).toList();
     }
 
     private void translate() {
         labels.forEach((key, label) -> label.setText(text.get(key)));
+        defaultTarget.setToolTipText(text.get("defaultTargetHint"));
         add.setText(text.get("add"));
         refresh.setText(text.get("refresh"));
         remove.setText(text.get("remove"));
@@ -185,29 +255,36 @@ public final class TargetSelectionPanel extends JPanel {
 
     private void loadGame() {
         if (catalog == null || !minecraft.isEnabled() || minecraft.getSelectedItem() == null) return;
+        updatingLoaders = true;
+        loader.setModel(new DefaultComboBoxModel<>(catalog.loaders(minecraft.getSelectedItem().toString()).toArray(String[]::new)));
+        updatingLoaders = false;
+        loadSelection();
+    }
+
+    private void loadSelection() {
+        if (catalog == null || !minecraft.isEnabled() || minecraft.getSelectedItem() == null
+                || loader.getSelectedItem() == null) return;
         VersionCatalog data = catalog;
         String mc = minecraft.getSelectedItem().toString();
+        String platform = loader.getSelectedItem().toString();
         int request = ++gameRequest;
         ready = false;
         javaVersion = 0;
         add.setEnabled(false);
         toolchain.setText(text.get("loadingVersions"));
-        loader.setModel(new DefaultComboBoxModel<>(data.loaders(mc).toArray(String[]::new)));
         updateLoader();
         new SwingWorker<Integer, Void>() {
             @Override protected Integer doInBackground() {
-                if (data.loaders(mc).contains("fabric")) data.loadCompatibleVersions(mc);
+                if ("fabric".equals(platform)) data.loadCompatibleVersions(mc);
                 return data.javaVersion(mc);
             }
             @Override protected void done() {
-                if (request != gameRequest || data != catalog || !mc.equals(minecraft.getSelectedItem())) return;
+                if (request != gameRequest || data != catalog || !mc.equals(minecraft.getSelectedItem())
+                        || !platform.equals(loader.getSelectedItem())) return;
                 try {
                     javaVersion = get();
                     ready = true;
                     updateLoader();
-                    toolchain.setText("Java " + javaVersion + " · Gradle "
-                            + (javaVersion >= 25 ? "9.x" : "8.14.4"));
-                    toolchain.setToolTipText(null);
                     setStatus("releases", data.minecraftVersions().size());
                 } catch (Exception error) {
                     ready = false;
@@ -234,6 +311,16 @@ public final class TargetSelectionPanel extends JPanel {
         api.setEnabled("fabric".equals(platform));
         updateChoiceLabels();
         updateReady();
+        if (ready) {
+            toolchain.setText("Java " + javaVersion + " · Gradle " + wrapperVersion(platform, mc));
+            toolchain.setToolTipText(null);
+        }
+    }
+
+    private String wrapperVersion(String platform, String mc) {
+        if ("fabric".equals(platform) && (javaVersion >= 25 || VersionCatalog.compare(mc, "1.21.4") > 0)) return "9.7.1";
+        if ("forge".equals(platform) && VersionCatalog.compare(mc, "1.21.5") >= 0) return "9.5.0";
+        return javaVersion >= 25 ? "9.5.1" : "8.14.4";
     }
 
     private void updateChoiceLabels() {
@@ -268,16 +355,16 @@ public final class TargetSelectionPanel extends JPanel {
         row.put("java_version", Integer.toString(javaVersion));
         row.put("gradle_java_version", Integer.toString(javaVersion >= 25 ? 25 : 21));
         row.put("blueprint", TargetPlan.blueprint(platform, mc, javaVersion));
-        row.put("wrapper_version", javaVersion >= 25 ? ("fabric".equals(platform) ? "9.7.1" : "9.5.1") : "8.14.4");
+        row.put("wrapper_version", wrapperVersion(platform, mc));
         if ("fabric".equals(platform) && VersionCatalog.compare(mc, "1.21.4") > 0) {
             row.put("loom_version", "1.18.2");
-            row.put("wrapper_version", "9.7.1");
         }
         if ("fabric".equals(platform)) row.put("fabric_api_version", api.getSelectedItem().toString());
-        if ("forge".equals(platform) && VersionCatalog.compare(mc, "1.20.1") > 0) row.put("forgegradle_version", "6.0.54");
+        if ("forge".equals(platform) && VersionCatalog.compare(mc, "1.20.1") > 0)
+            row.put("forgegradle_version", VersionCatalog.compare(mc, "1.21.5") >= 0 ? "7.0.40" : "6.0.54");
         selected.add(row);
         append(row);
-        changed.accept(selections());
+        selectionChanged();
         setStatus("selected", selected.size());
     }
 }

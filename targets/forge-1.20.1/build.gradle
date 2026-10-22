@@ -70,5 +70,6 @@ jar {
     ])
 }
 
+apply from: file('../../gradle/target-conventions/pack-metadata.gradle')
 apply from: file('../../gradle/target-conventions/publish.gradle')
 apply from: file('../../gradle/target-conventions/forge-common-mixin.gradle')

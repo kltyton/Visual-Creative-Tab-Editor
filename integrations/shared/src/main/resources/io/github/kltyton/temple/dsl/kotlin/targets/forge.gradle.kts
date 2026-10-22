@@ -1,4 +1,5 @@
 import net.neoforged.moddevgradle.legacyforge.dsl.LegacyForgeExtension
+import net.neoforged.nfrtgradle.CreateMinecraftArtifacts
 
 plugins {
     `java-library`
@@ -26,6 +27,8 @@ extensions.configure<LegacyForgeExtension> {
         sourceSet(project(":common").extensions.getByType<SourceSetContainer>().named("main").get())
     }
 }
+extra["templeMinecraftResources"] = tasks.named<CreateMinecraftArtifacts>("createMinecraftArtifacts").flatMap { it.resourcesArtifact }
+apply(from = file("../../gradle/target-conventions/pack-metadata.gradle.kts"))
 apply(from = file("../../gradle/target-conventions/publish.gradle.kts"))
 
 dependencies { add("annotationProcessor", "org.spongepowered:mixin:0.8.5-SNAPSHOT:processor") }

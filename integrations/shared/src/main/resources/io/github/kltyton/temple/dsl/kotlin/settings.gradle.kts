@@ -5,7 +5,7 @@ pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }
 plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0" }
 
 val identity = Properties().apply { file("gradle.properties").reader(Charsets.UTF_8).use { load(it) } }
-rootProject.name = identity.getProperty("mod_name", "KltytonTemple")
+rootProject.name = identity.getProperty("mod_id")
 val targets = file("targets").listFiles()?.filter { it.isDirectory }?.sortedBy { it.name }.orEmpty()
 require(targets.isNotEmpty()) { "No target directories found" }
 val wrapperRoots = listOf(file("gradle/wrapper")) + targets.map { it.resolve("gradle/wrapper") }

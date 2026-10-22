@@ -14,6 +14,7 @@ legacyForge {
     }
     mods { "${mod_id}" { sourceSet sourceSets.main; sourceSet project(':common').sourceSets.main } }
 }
+apply from: file('../../gradle/target-conventions/pack-metadata.gradle')
 apply from: file('../../gradle/target-conventions/publish.gradle')
 
 dependencies { annotationProcessor 'org.spongepowered:mixin:0.8.5-SNAPSHOT:processor' }

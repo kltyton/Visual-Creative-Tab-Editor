@@ -1,4 +1,5 @@
 import groovy.json.JsonOutput
+import groovy.json.JsonGenerator
 import org.gradle.api.artifacts.ProjectDependency
 import java.util.Properties
 
@@ -78,9 +79,12 @@ tasks.named<ProcessResources>("processResources") {
         .associateWith { identity.getProperty(it) }.toMutableMap<String, Any>()
     values["minecraft_version"] = minecraft
     values["java_version"] = javaVersion
-    val escaped = values.mapValues { JsonOutput.toJson(it.value.toString()).let { encoded -> encoded.substring(1, encoded.length - 1) } }
+    val json = JsonGenerator.Options().disableUnicodeEscaping().build()
+    val escaped = values.mapValues { json.toJson(it.value.toString()).replace("\u007f", "\\u007f").let { encoded -> encoded.substring(1, encoded.length - 1) } }
     inputs.properties(values)
-    filesMatching(listOf("*.mixins.json", "pack.mcmeta")) { expand(escaped) }
+    filesMatching(listOf("*.mixins.json", "pack.mcmeta")) {
+        filter { line: String -> Regex("\\$\\{([a-z_]+)\\}").replace(line) { match -> escaped[match.groupValues[1]] ?: match.value } }
+    }
 }
 tasks.named<ProcessResources>("processTestResources") { from(commonRoot.resolve("src/test/resources")) }
 tasks.named<Jar>("sourcesJar") {
@@ -103,3 +107,4 @@ rootProject.afterEvaluate {
 }
 extra["templeResourceDirectories"] = resourceDirectories
 extra["templeSourceDirectories"] = javaDirectories + constants
+apply(from = templeRoot.resolve("gradle/target-conventions/ide-sources.gradle"))

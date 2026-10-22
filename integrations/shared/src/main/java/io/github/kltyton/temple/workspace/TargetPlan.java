@@ -26,7 +26,25 @@ public final class TargetPlan {
     private record PlannedTarget(Map<String, String> row, Path from, Path to, Properties properties, Properties wrapper) {}
 
     public static void apply(Path root, List<Map<String, String>> selections, boolean removeBlueprints) throws IOException {
+        String preferred = removeBlueprints ? read(root.resolve("gradle.properties")).getProperty("temple_default_target") : null;
+        String existing = preferred;
+        if (existing != null && selections.stream().noneMatch(row ->
+                existing.equals(row.get("loader") + "-" + row.get("minecraft_version")))) preferred = null;
+        apply(root, selections, removeBlueprints, preferred);
+    }
+
+    public static String defaultTarget(List<Map<String, String>> selections, String preferred) {
         if (selections.isEmpty()) throw new IllegalArgumentException("Select at least one target");
+        List<String> ids = selections.stream().map(row -> row.get("loader") + "-" + row.get("minecraft_version")).toList();
+        if (preferred == null || preferred.isBlank()) return ids.get(0);
+        if (!ids.contains(preferred)) throw new IllegalArgumentException("Default editing target is not selected: " + preferred);
+        return preferred;
+    }
+
+    public static void apply(Path root, List<Map<String, String>> selections, boolean removeBlueprints,
+                             String preferred) throws IOException {
+        if (selections.isEmpty()) throw new IllegalArgumentException("Select at least one target");
+        String initialTarget = removeBlueprints ? defaultTarget(selections, preferred) : null;
         BuildScripts.dsl(root);
         Path targets = root.resolve("targets").toRealPath();
         Set<String> wanted = new LinkedHashSet<>(), blueprints = new LinkedHashSet<>();
@@ -115,20 +133,28 @@ public final class TargetPlan {
                 write(to.resolve("gradle/wrapper/gradle-wrapper.properties"), wrapper);
             }
             if (row.containsKey("forgegradle_version") && BuildScripts.dsl(root) == BuildScripts.Dsl.GROOVY) {
-                Files.writeString(to.resolve("build.gradle"), "plugins {\n    id 'java-library'\n    id 'maven-publish'\n    id 'org.spongepowered.mixin' version '0.7-SNAPSHOT'\n    id 'net.minecraftforge.gradle' version \"${forgegradle_version}\"\n" +
-                        "    id 'me.modmuss50.mod-publish-plugin' version \"${publish_plugin_version}\"\n}\n" +
-                        "ext.templeMixinPluginVersion = org.spongepowered.asm.gradle.plugins.MixinGradlePlugin.VERSION\n" +
-                        "ext.templeForgeRunTaskType = net.minecraftforge.gradle.common.util.runs.MinecraftRunTask.class\n" +
-                        "apply from: file('../../gradle/target-conventions/forgegradle.gradle')\n");
+                boolean modernForge = Integer.parseInt(row.get("forgegradle_version")
+                        .replace("[", "").replace("(", "").split("\\.")[0]) >= 7;
+                if (modernForge) {
+                    Files.writeString(to.resolve("build.gradle"), "plugins {\n    id 'java-library'\n    id 'net.minecraftforge.gradle' version \"${forgegradle_version}\"\n" +
+                            "    id 'me.modmuss50.mod-publish-plugin' version \"${publish_plugin_version}\"\n}\n" +
+                            "apply from: file('../../gradle/target-conventions/forgegradle-modern.gradle')\n");
+                } else {
+                    Files.writeString(to.resolve("build.gradle"), "plugins {\n    id 'java-library'\n    id 'maven-publish'\n    id 'org.spongepowered.mixin' version '0.7-SNAPSHOT'\n    id 'net.minecraftforge.gradle' version \"${forgegradle_version}\"\n" +
+                            "    id 'me.modmuss50.mod-publish-plugin' version \"${publish_plugin_version}\"\n}\n" +
+                            "ext.templeMixinPluginVersion = org.spongepowered.asm.gradle.plugins.MixinGradlePlugin.VERSION\n" +
+                            "ext.templeForgeRunTaskType = net.minecraftforge.gradle.common.util.runs.MinecraftRunTask.class\n" +
+                            "apply from: file('../../gradle/target-conventions/forgegradle.gradle')\n");
+                }
             }
             BuildScripts.prepareTarget(root, to);
         }
         for (Path path : retired.stream().sorted(Comparator.reverseOrder()).toList()) Files.delete(path);
         Properties identity = read(root.resolve("gradle.properties"));
         if (removeBlueprints) {
-            identity.setProperty("temple_default_target", wanted.iterator().next());
+            identity.setProperty("temple_default_target", initialTarget);
             Files.createDirectories(root.resolve(".temple"));
-            Files.writeString(root.resolve(".temple/active-target"), wanted.iterator().next());
+            Files.writeString(root.resolve(".temple/active-target"), initialTarget + '\n');
         }
         identity.setProperty("temple_idea_project", "true");
         write(root.resolve("gradle.properties"), identity);

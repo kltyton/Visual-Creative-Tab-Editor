@@ -1,4 +1,4 @@
-import groovy.json.JsonOutput
+import groovy.json.JsonGenerator
 import java.util.Properties
 
 val templeRoot = file("../..").canonicalFile
@@ -58,11 +58,15 @@ tasks.named<ProcessResources>("processResources") {
         "forge_loader_version_range" to (findProperty("forge_loader_version_range") ?: "").toString(),
         "neoforge_version" to (findProperty("neoforge_version") ?: "").toString(),
         "neoforge_loader_version_range" to (findProperty("neoforge_loader_version_range") ?: "").toString()))
-    val escaped = raw.mapValues { JsonOutput.toJson(it.value).let { json -> json.substring(1, json.length - 1) } }
+    val json = JsonGenerator.Options().disableUnicodeEscaping().build()
+    val escaped = raw.mapValues { json.toJson(it.value).replace("\u007f", "\\u007f").let { encoded -> encoded.substring(1, encoded.length - 1) } }
     inputs.properties(raw)
-    filesMatching(listOf("fabric.mod.json", "META-INF/mods.toml", "META-INF/neoforge.mods.toml", "pack.mcmeta", "*.mixins.json")) { expand(escaped) }
+    filesMatching(listOf("fabric.mod.json", "META-INF/mods.toml", "META-INF/neoforge.mods.toml", "pack.mcmeta", "*.mixins.json")) {
+        filter { line: String -> Regex("\\$\\{([a-z_]+)\\}").replace(line) { match -> escaped[match.groupValues[1]] ?: match.value } }
+    }
 }
 tasks.named<Jar>("jar") {
+    manifest.attributes("Implementation-Version" to project.version.toString())
     from(commonProject.extensions.getByType<SourceSetContainer>().named("main").map { it.output })
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(templeRoot.resolve("LICENSE")) { rename { "LICENSE_$modId" } }
