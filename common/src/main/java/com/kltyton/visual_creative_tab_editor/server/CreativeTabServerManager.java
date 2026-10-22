@@ -669,7 +669,8 @@ public final class CreativeTabServerManager {
             List<CreativeModeTab> registryTabs = BuiltInRegistries.CREATIVE_MODE_TAB.stream().toList();
             Map<CreativeModeTab, NativeContents> originalContents = new IdentityHashMap<>();
             for (CreativeModeTab tab : registryTabs) {
-                List<ItemStack> displayItems = copyNativeStacks(tab.getDisplayItems(), true);
+                var contents = (com.kltyton.visual_creative_tab_editor.runtime.CreativeTabContents) tab;
+                List<ItemStack> displayItems = List.copyOf(contents.visualCreativeTabEditor$backingDisplayItems());
                 Set<ItemStack> searchItems = com.kltyton.visual_creative_tab_editor.platform.item.StackData.set();
                 tab.getSearchTabDisplayItems().forEach(stack -> searchItems.add(stack.copyWithCount(1)));
                 originalContents.put(tab, new NativeContents(displayItems, searchItems));
@@ -696,7 +697,8 @@ public final class CreativeTabServerManager {
                     int tabOrder = order++;
                     try {
                         List<ItemStack> items = tab.getType() == CreativeModeTab.Type.CATEGORY
-                                ? copyNativeStacks(tab.getDisplayItems(), true)
+                                ? copyNativeStacks(((com.kltyton.visual_creative_tab_editor.runtime.CreativeTabContents) tab)
+                                        .visualCreativeTabEditor$catalogDisplayItems(), true)
                                 : List.of();
                         List<ItemStack> searchItems = tab.getType() == CreativeModeTab.Type.CATEGORY
                                 ? copyNativeStacks(tab.getSearchTabDisplayItems(), false)

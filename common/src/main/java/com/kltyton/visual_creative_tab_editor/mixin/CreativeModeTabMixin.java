@@ -27,6 +27,11 @@ public abstract class CreativeModeTabMixin implements com.kltyton.visual_creativ
     private Set<ItemStack> displayItemsSearchTab;
 
     @Override
+    public Collection<ItemStack> visualCreativeTabEditor$backingDisplayItems() {
+        return this.displayItems;
+    }
+
+    @Override
     public void visualCreativeTabEditor$replaceContents(Collection<ItemStack> display, Collection<ItemStack> searchable) {
         Collection<ItemStack> newDisplay = new java.util.ArrayList<>(display);
         Set<ItemStack> newSearch = com.kltyton.visual_creative_tab_editor.platform.item.StackData.set();

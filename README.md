@@ -80,7 +80,7 @@ flowchart LR
 
 ## 支持版本 / Supported versions
 
-当前 Mod 版本：`2.3.0`。
+当前 Mod 版本：`2.3.1`。
 
 | Minecraft | Loader | Java |
 | --- | --- | --- |
@@ -115,8 +115,8 @@ Wiki 源文件同时保存在 [`wiki/`](wiki/Home.md)。
 构建产物：
 
 ```text
-targets/fabric-26.2/build/libs/visual_creative_tab_editor-fabric-26.2-2.3.0.jar
-targets/neoforge-26.2/build/libs/visual_creative_tab_editor-neoforge-26.2-2.3.0.jar
+targets/fabric-26.2/build/libs/visual_creative_tab_editor-fabric-26.2-2.3.1.jar
+targets/neoforge-26.2/build/libs/visual_creative_tab_editor-neoforge-26.2-2.3.1.jar
 ```
 
 工程使用 [KltytonTemple](https://github.com/kltyton/KltytonTemple) 的独立目标入口。`select_<loader>_<version>` 设置根 `build`、`runClient` 的默认目标；`buildAllTargets` 构建全部九个目标。IDEA 将各目标独立关联，每个目标使用自己的 Wrapper 和 Java。

@@ -6,6 +6,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "CreativeModeTabMixin",
+    "compat.flavorimmerseddaily.SectionedCreativeTabContentsMixin",
     "NativeTabBackgroundMixin",
     "CreativeModeTabsMixin",
     "PackRepositoryMixin",
